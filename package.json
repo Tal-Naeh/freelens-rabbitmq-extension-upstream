@@ -1,10 +1,10 @@
 {
-  "name": "@tal-naeh/freelens-rabbitmq-extension",
+  "name": "@freelensapp/rabbitmq-extension",
   "version": "0.2.2",
   "description": "Freelens extension for RabbitMQ — cluster-native queue, exchange, connection and message inspection",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Tal-Naeh/freelens-rabbitmq-extension.git",
+    "url": "git+https://github.com/freelensapp/freelens-rabbitmq-extension.git",
     "directory": "."
   },
   "main": "out/main/index.js",

@@ -1,6 +1,6 @@
 # Freelens RabbitMQ Extension
 
-[![npm](https://img.shields.io/npm/v/%40tal-naeh%2Ffreelens-rabbitmq-extension)](https://www.npmjs.com/package/@tal-naeh/freelens-rabbitmq-extension)
+[![npm](https://img.shields.io/npm/v/%40freelensapp%2Frabbitmq-extension)](https://www.npmjs.com/package/@freelensapp/rabbitmq-extension)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A **cluster-native RabbitMQ console** inside [Freelens](https://freelens.app). It discovers RabbitMQ
@@ -57,11 +57,11 @@ architecture, tailored for RabbitMQ.
 Open the Freelens **Extensions** page (`ctrl`+`shift`+`E` / `cmd`+`shift`+`E`), paste the npm name and click **Install**:
 
 ```text
-@tal-naeh/freelens-rabbitmq-extension
+@freelensapp/rabbitmq-extension
 ```
 
 Alternatively download the `.tgz` from the
-[GitHub releases](https://github.com/Tal-Naeh/freelens-rabbitmq-extension/releases) page and drag it
+[GitHub releases](https://github.com/freelensapp/freelens-rabbitmq-extension/releases) page and drag it
 into the Freelens window, or paste its path on the Extensions page.
 
 ## Usage
