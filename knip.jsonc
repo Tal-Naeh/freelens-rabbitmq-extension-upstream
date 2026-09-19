@@ -6,6 +6,9 @@
 
   "ignoreBinaries": ["electron-rebuild", "yq"],
   "ignoreDependencies": [
+    // Only referenced from tsconfig.json "paths": it pins the Freelens core typings that
+    // moduleResolution=bundler cannot find through the package's exports map.
+    "@freelensapp/core",
     // Build-only plugins; Knip does not execute the Electron Vite config.
     "@vitejs/plugin-react",
     "vite-plugin-sass-dts",
