@@ -2,9 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- TypeScript 7. `moduleResolution=node10` is gone, so the Freelens core typings are now pinned through `tsconfig.json` `paths` (core's `exports` map has no `types` condition); `@freelensapp/core` is a devDependency for that reason only (#21, #33).
+
 ### Fixed
 
 - Requests through the port-forward no longer time out when an idle keep-alive socket is reused: the HTTP client now opens a fresh connection per request, because the `@kubernetes/client-node` port-forward does not close the local socket when the pod closes the tunnel (#27).
+- Discovery no longer lists the RabbitMQ Cluster Operator's own metrics Service as a cluster: Services labelled as operator components are skipped, and a Management port recognised only by its name now needs an AMQP port next to it (#25).
+- Sidebar entries keep the selected RabbitMQ cluster: the target is remembered per Kubernetes cluster in the renderer session, so Queues, Exchanges and Connections no longer fall back to the first discovered cluster when opened from the sidebar (#26).
 
 ## v0.3.0 - 2026-09-19
 
