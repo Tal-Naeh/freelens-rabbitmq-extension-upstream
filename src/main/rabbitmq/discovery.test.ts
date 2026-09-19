@@ -3,6 +3,7 @@ import {
   classifyService,
   credentialHintFromWorkload,
   discoverRabbitmq,
+  isOperatorComponent,
   labelSelectorOf,
   parseRabbitmqCluster,
   parseServiceTarget,
@@ -35,6 +36,22 @@ const operatorSvc: KubeObject = {
       { name: "amqp", port: 5672, targetPort: 5672 },
       { name: "management", port: 15672, targetPort: 15672 },
     ],
+  },
+};
+
+const operatorMetricsSvc: KubeObject = {
+  metadata: {
+    name: "rabbitmq-cluster-operator-metrics-service",
+    namespace: "rabbitmq-system",
+    labels: {
+      "app.kubernetes.io/component": "rabbitmq-operator",
+      "app.kubernetes.io/name": "rabbitmq-cluster-operator",
+      "app.kubernetes.io/part-of": "rabbitmq",
+    },
+  },
+  spec: {
+    selector: { "app.kubernetes.io/name": "rabbitmq-cluster-operator" },
+    ports: [{ name: "http", port: 8080, targetPort: 8080 }],
   },
 };
 
@@ -168,6 +185,36 @@ describe("classifyService", () => {
       classifyService({ metadata: { name: "grafana" }, spec: { ports: [{ name: "http", port: 3000 }] } }),
     ).toBeUndefined();
   });
+  it("ignores the Cluster Operator's own metrics Service (#25)", () => {
+    expect(isOperatorComponent(operatorMetricsSvc)).toBe(true);
+    expect(isOperatorComponent(operatorSvc)).toBe(false);
+    expect(isOperatorComponent(bitnamiSvc)).toBe(false);
+    expect(classifyService(operatorMetricsSvc)).toBeUndefined();
+  });
+  it("accepts a management port by name only when the Service also exposes AMQP (#25)", () => {
+    const httpOnly: KubeObject = {
+      metadata: { name: "rabbit-console", namespace: "tools" },
+      spec: { selector: { app: "rabbit-console" }, ports: [{ name: "http", port: 8080 }] },
+    };
+    expect(classifyService(httpOnly)).toBeUndefined();
+    const httpAndAmqp: KubeObject = {
+      ...httpOnly,
+      spec: {
+        ...httpOnly.spec,
+        ports: [
+          { name: "http", port: 8080 },
+          { name: "amqp", port: 5672 },
+        ],
+      },
+    };
+    expect(classifyService(httpAndAmqp)?.managementPort.name).toBe("http");
+  });
+  it("still accepts a lone well-known management port by number on a rabbit-named Service", () => {
+    expect(
+      classifyService({ metadata: { name: "rabbit-mgmt" }, spec: { ports: [{ name: "web", port: 15672 }] } })
+        ?.managementPort.port,
+    ).toBe(15672);
+  });
 });
 
 describe("credential hints from workloads", () => {
@@ -246,6 +293,12 @@ describe("discoverRabbitmq", () => {
     expect(targets[0].serviceName).toBe("myrel-rabbitmq");
   });
 
+  it("does not list the operator metrics Service next to the operator cluster (#25)", async () => {
+    const targets = await discoverRabbitmq(
+      fakeReader({ crs: [operatorCr], services: [operatorSvc, operatorMetricsSvc], workloads: [] }),
+    );
+    expect(targets.map((t) => `${t.namespace}/${t.name}`)).toEqual(["messaging/rabbit"]);
+  });
   it("falls back to guest when nothing hints at credentials", async () => {
     const plain: KubeObject = {
       metadata: { name: "rabbitmq", namespace: "default" },

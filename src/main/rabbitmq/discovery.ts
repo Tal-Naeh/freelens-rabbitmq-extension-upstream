@@ -36,6 +36,21 @@ function serviceLooksLikeRabbitmq(svc: KubeObject): boolean {
   return haystack.includes("rabbit");
 }
 
+const OPERATOR_COMPONENT = /operator/i;
+
+/**
+ * Services of the RabbitMQ Cluster Operator itself (e.g. `rabbitmq-cluster-operator-metrics-service`,
+ * labelled `app.kubernetes.io/component: rabbitmq-operator`) are not brokers, even though their name
+ * and labels contain "rabbit" (#25). Pure.
+ */
+export function isOperatorComponent(svc: KubeObject): boolean {
+  const labels = svc.metadata?.labels ?? {};
+  return (
+    OPERATOR_COMPONENT.test(labels["app.kubernetes.io/component"] ?? "") ||
+    OPERATOR_COMPONENT.test(labels["app.kubernetes.io/name"] ?? "")
+  );
+}
+
 /** Extracts the image tag (`rabbitmq:3.13.2-management` → `3.13.2`). Pure. */
 export function versionFromImage(image: string | undefined): string | undefined {
   if (!image) return undefined;
@@ -98,22 +113,29 @@ export interface ServiceCandidate {
   amqpPort?: ServicePort;
 }
 
-/** Find the Management + AMQP ports on a Service, if it looks like RabbitMQ. Pure. */
+/**
+ * Find the Management + AMQP ports on a Service, if it looks like RabbitMQ. Pure.
+ *
+ * The Management port is recognised by its well-known number (15672/15671). A port recognised only by
+ * its *name* (`http`, `management`, ...) counts only when the same Service also exposes AMQP, so that
+ * an unrelated HTTP Service whose name happens to contain "rabbit" is not taken for a broker (#25).
+ */
 export function classifyService(svc: KubeObject): ServiceCandidate | undefined {
+  if (isOperatorComponent(svc)) return undefined;
   const ports = (svc.spec?.ports ?? []) as ServicePort[];
-  const management = ports.find(
-    (p) =>
-      (p.port !== undefined && MANAGEMENT_PORTS.has(p.port)) ||
-      (typeof p.targetPort === "number" && MANAGEMENT_PORTS.has(p.targetPort)) ||
-      (p.name !== undefined && MANAGEMENT_NAME.test(p.name) && serviceLooksLikeRabbitmq(svc)),
-  );
-  if (!management) return undefined;
   const amqp = ports.find(
     (p) =>
       (p.port !== undefined && AMQP_PORTS.has(p.port)) ||
       (typeof p.targetPort === "number" && AMQP_PORTS.has(p.targetPort)) ||
       (p.name !== undefined && AMQP_NAME.test(p.name)),
   );
+  const management = ports.find(
+    (p) =>
+      (p.port !== undefined && MANAGEMENT_PORTS.has(p.port)) ||
+      (typeof p.targetPort === "number" && MANAGEMENT_PORTS.has(p.targetPort)) ||
+      (amqp !== undefined && p.name !== undefined && MANAGEMENT_NAME.test(p.name) && serviceLooksLikeRabbitmq(svc)),
+  );
+  if (!management) return undefined;
   if (!amqp && !serviceLooksLikeRabbitmq(svc)) return undefined;
   return { service: svc, managementPort: management, amqpPort: amqp };
 }
