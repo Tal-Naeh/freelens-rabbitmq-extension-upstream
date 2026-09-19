@@ -5,11 +5,12 @@
     "composite": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "moduleResolution": "node10",
     "jsx": "react-jsx",
     "types": ["node", "vite/client", "electron-vite/node"],
     "paths": {
-      "@vitejs/plugin-react": ["./node_modules/@vitejs/plugin-react/dist/index.d.ts"]
+      "@vitejs/plugin-react": ["./node_modules/@vitejs/plugin-react/dist/index.d.ts"],
+      "@freelensapp/core/main": ["./node_modules/@freelensapp/core/static/build/library/src/main/library.d.ts"],
+      "@freelensapp/core/renderer": ["./node_modules/@freelensapp/core/static/build/library/src/renderer/library.d.ts"]
     }
   }
 }
