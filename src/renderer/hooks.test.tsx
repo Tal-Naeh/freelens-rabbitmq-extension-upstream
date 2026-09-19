@@ -3,7 +3,7 @@
 import { render, unmountComponentAtNode } from "react-dom";
 import { act } from "react-dom/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SelectionStore, useDeferredOpen, useSelectionParam } from "./hooks";
+import { SelectionStore, useDeferredOpen, useSelectionParam, useStoredPageParam } from "./hooks";
 
 import type { Renderer } from "@freelensapp/extensions";
 
@@ -109,6 +109,47 @@ describe("useSelectionParam", () => {
 function OpenProbe({ open }: { open: boolean }) {
   return <div>{useDeferredOpen(open) ? "open" : "closed"}</div>;
 }
+
+let latestStored: { value: string; set: (v: string) => void };
+
+function StoredProbe({ param, store }: { param: Renderer.Navigation.PageParam<string>; store: SelectionStore }) {
+  const [value, set] = useStoredPageParam("target:test", param, store);
+  latestStored = { value, set };
+  return <div>{value || "none"}</div>;
+}
+
+describe("useStoredPageParam", () => {
+  let store: SelectionStore;
+  beforeEach(() => {
+    store = new SelectionStore();
+  });
+
+  it("keeps the selected target across a sidebar navigation that carries no target (#26)", () => {
+    // Clusters page opened target B explicitly: URL carries it.
+    const first = fakeParam("b");
+    act(() => render(<StoredProbe param={first.param} store={store} />, container));
+    expect(container.textContent).toBe("b");
+    // Sidebar entry: a new page mount whose URL param is empty (page defaults).
+    act(() => unmountComponentAtNode(container));
+    const second = fakeParam("");
+    act(() => render(<StoredProbe param={second.param} store={store} />, container));
+    expect(container.textContent).toBe("b");
+  });
+
+  it("selecting a target writes both the URL and the session store; a later deep link wins", () => {
+    const { param, store: url } = fakeParam("");
+    act(() => render(<StoredProbe param={param} store={store} />, container));
+    expect(container.textContent).toBe("none");
+    act(() => latestStored.set("a"));
+    expect(url.value).toBe("a");
+    expect(store.get("target:test")).toBe("a");
+    act(() => unmountComponentAtNode(container));
+    const deep = fakeParam("c");
+    act(() => render(<StoredProbe param={deep.param} store={store} />, container));
+    expect(container.textContent).toBe("c");
+    expect(store.get("target:test")).toBe("c");
+  });
+});
 
 describe("useDeferredOpen", () => {
   it("opens one tick after the flag flips, closes immediately", () => {

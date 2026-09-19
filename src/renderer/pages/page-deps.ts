@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useTargetSelection } from "../components/target-selection";
-import { usePageParam } from "../hooks";
+import { useStoredPageParam } from "../hooks";
 
 import type { Renderer } from "@freelensapp/extensions";
 
@@ -32,7 +32,8 @@ export interface TargetPage {
 /** Shared plumbing for every page that operates on one selected RabbitMQ target. */
 export function useTargetPage(deps: PageDeps, targetParam: Param | undefined): TargetPage {
   const clusterKey = deps.kubernetesClusterId ?? "active";
-  const [targetId, setTargetId] = usePageParam(targetParam);
+  // Remembered per Kubernetes cluster so sidebar navigation (no target in the URL) keeps the selection (#26).
+  const [targetId, setTargetId] = useStoredPageParam(`target:${clusterKey}`, targetParam);
   const discover = useCallback(
     () => deps.client.discover({ clusterId: deps.kubernetesClusterId }),
     [deps.client, deps.kubernetesClusterId],
