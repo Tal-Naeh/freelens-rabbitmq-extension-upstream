@@ -297,6 +297,12 @@ pnpm clean:node_modules
 pnpm build
 ```
 
+## Credits
+
+Originally created and developed by [Tal Naeh](https://github.com/Tal-Naeh)
+as `@tal-naeh/freelens-rabbitmq-extension`, and maintained by him as part of
+the Freelens organisation since September 2026.
+
 ## License
 
 Copyright (c) 2025-2026 Freelens Authors.

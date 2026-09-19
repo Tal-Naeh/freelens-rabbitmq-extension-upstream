@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.0 - 2026-09-19
+
+### Changed
+
+- The extension moved to the Freelens organisation. The npm package is now `@freelensapp/rabbitmq-extension` and the repository is `freelensapp/freelens-rabbitmq-extension`; the previous package `@tal-naeh/freelens-rabbitmq-extension` is deprecated and points here. Uninstall the old package in Freelens before installing the new one.
+- CI, configuration and README aligned with the freelensapp extension standard, including integration tests that run the extension inside Freelens on a KinD cluster with a disposable RabbitMQ fixture.
+- Dependency updates via Renovate (Vite 8.3, Vitest 4.1, Biome 2.5.14, pnpm 10.34.5 and others).
+
 ## 0.2.2
 
 - Fix: Clusters page cards — name truncates with an ellipsis instead of wrapping, tags wrap inside the card, facts laid out as a grid; no more overlap/overflow.
