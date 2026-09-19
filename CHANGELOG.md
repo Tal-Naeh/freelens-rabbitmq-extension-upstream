@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Requests through the port-forward no longer time out when an idle keep-alive socket is reused: the HTTP client now opens a fresh connection per request, because the `@kubernetes/client-node` port-forward does not close the local socket when the pod closes the tunnel (#27).
+
 ## v0.3.0 - 2026-09-19
 
 ### Changed

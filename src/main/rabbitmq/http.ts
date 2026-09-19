@@ -43,14 +43,17 @@ function method(status: number): string {
  */
 export function createJsonHttpClient(options: HttpClientOptions): JsonHttpClient {
   const authorization = `Basic ${Buffer.from(`${options.auth.username}:${options.auth.password}`).toString("base64")}`;
+  // No keep-alive: requests go through the @kubernetes/client-node PortForward, which does not
+  // close the local socket when the pod closes its side of the tunnel. A reused idle socket then
+  // hangs until the client timeout (#27). Fresh connections per request are cheap on a local tunnel.
   const agent = options.tls
     ? new https.Agent({
-        keepAlive: true,
+        keepAlive: false,
         maxSockets: 4,
         ca: options.tls.ca,
         rejectUnauthorized: options.tls.rejectUnauthorized,
       })
-    : new http.Agent({ keepAlive: true, maxSockets: 4 });
+    : new http.Agent({ keepAlive: false, maxSockets: 4 });
 
   return {
     request<T>(httpMethod: HttpMethod, path: string, body?: unknown): Promise<T> {
