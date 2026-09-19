@@ -75,6 +75,33 @@ export function usePageParam(param: Renderer.Navigation.PageParam<string> | unde
 }
 
 /**
+ * A page param that is also remembered in the renderer session. The URL wins when it carries a
+ * value (deep link, or a page navigating with an explicit param); when the URL param is empty, the
+ * last value set in this session is used. Sidebar entries navigate with page defaults only, so
+ * without this every sidebar click would drop the selected target (#26).
+ */
+export function useStoredPageParam(
+  key: string,
+  param: Renderer.Navigation.PageParam<string> | undefined,
+  store: SelectionStore = selectionStore,
+): [string, (v: string) => void] {
+  const [url, setUrl] = usePageParam(param);
+  const [stored, setStored] = useState(() => store.get(key));
+  useEffect(() => store.subscribe(key, setStored), [store, key]);
+  useEffect(() => {
+    if (url) store.set(key, url);
+  }, [store, key, url]);
+  const set = useCallback(
+    (value: string) => {
+      store.set(key, value);
+      setUrl(value);
+    },
+    [store, key, setUrl],
+  );
+  return [url || store.get(key) || stored, set];
+}
+
+/**
  * Renderer-session store for UI selections (open drawer, active tab). Lives outside React so it
  * survives page re-mounts caused by route/URL changes, and outside the URL so a page param going
  * missing can never close a drawer.
