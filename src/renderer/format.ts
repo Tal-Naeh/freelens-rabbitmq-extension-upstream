@@ -71,3 +71,13 @@ export function matchesQuery(query: string, ...fields: (string | undefined)[]): 
   if (!q) return true;
   return fields.some((f) => f?.toLowerCase().includes(q));
 }
+
+/**
+ * Management port for the cluster card: the Service port number when known, with the named
+ * container port the tunnel uses in brackets (`15672 (management)`); otherwise whatever we have (#40).
+ */
+export function formatManagementPort(port: number | string, portNumber?: number): string {
+  if (portNumber === undefined) return String(port);
+  if (typeof port === "string" && port !== String(portNumber)) return `${portNumber} (${port})`;
+  return String(portNumber);
+}

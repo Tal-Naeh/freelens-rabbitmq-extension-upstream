@@ -56,6 +56,8 @@ export interface DiscoveredRabbitmqInfo {
   serviceName?: string;
   /** Container port of the Management API (name or number; resolved against the pod when named). */
   managementPort: number | string;
+  /** Port number of the Management API on the Service, for display; the forward may use a name (#40). */
+  managementPortNumber?: number;
   managementTls: boolean;
   amqpPort?: number;
   amqpTls: boolean;

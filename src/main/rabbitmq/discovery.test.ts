@@ -5,6 +5,7 @@ import {
   discoverRabbitmq,
   isOperatorComponent,
   labelSelectorOf,
+  managementPortNumber,
   parseRabbitmqCluster,
   parseServiceTarget,
   versionFromImage,
@@ -136,6 +137,7 @@ describe("parseRabbitmqCluster", () => {
       podSelector: "app.kubernetes.io/name=rabbit",
       serviceName: "rabbit",
       managementPort: "management",
+      managementPortNumber: 15672,
       managementTls: false,
       amqpPort: 5672,
       version: "3.13.2",
@@ -165,6 +167,16 @@ describe("parseRabbitmqCluster", () => {
     const mixed = parseRabbitmqCluster({ ...operatorCr, spec: { ...operatorCr.spec, tls: { secretName: "x" } } }, [])!;
     expect(mixed.managementTls).toBe(false);
     expect(mixed.amqpTls).toBe(true);
+  });
+});
+
+describe("managementPortNumber", () => {
+  it("reads the number of the named port from the client Service", () => {
+    expect(managementPortNumber(operatorSvc, "management", false)).toBe(15672);
+  });
+  it("falls back to the well-known number when the Service is missing", () => {
+    expect(managementPortNumber(undefined, "management", false)).toBe(15672);
+    expect(managementPortNumber(undefined, "management-tls", true)).toBe(15671);
   });
 });
 
@@ -267,6 +279,7 @@ describe("parseServiceTarget", () => {
       provider: "Bitnami chart",
       podSelector: "app.kubernetes.io/instance=myrel,app.kubernetes.io/name=rabbitmq",
       managementPort: "stats",
+      managementPortNumber: 15672,
       managementTls: false,
       amqpPort: 5672,
       version: "3.12.10",
