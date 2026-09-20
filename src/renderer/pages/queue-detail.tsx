@@ -1,5 +1,6 @@
 import { Renderer } from "@freelensapp/extensions";
 import { useState } from "react";
+import { RABBITMQ_LIVE_REFRESH_MS } from "../../common/constants";
 import { parseIpcError } from "../../common/errors";
 import { ConnectionErrorPanel } from "../components/connection-error";
 import { ArgumentsView, KeyValueList, LoadingState, StatusDot } from "../components/page-shell";
@@ -98,8 +99,13 @@ export function QueueDetailDrawer({
 }) {
   const key =
     queue && page.target ? `queue:${page.clusterKey}:${page.target.targetId}:${queue.vhost}:${queue.name}` : undefined;
-  const detail = useResource(key, () =>
-    deps.client.queueDetail(page.request({ vhost: queue!.vhost, queue: queue!.name })),
+  // Live like the Queues table. The Management API serves counters from statistics the broker emits
+  // every few seconds, so the reload right after a write action (purge, publish) can still return the
+  // old numbers; the periodic refresh corrects them, and keeps Ready/Unacked and the rates current (#39).
+  const detail = useResource(
+    key,
+    () => deps.client.queueDetail(page.request({ vhost: queue!.vhost, queue: queue!.name })),
+    { refreshMs: RABBITMQ_LIVE_REFRESH_MS },
   );
   const isOpen = useDeferredOpen(Boolean(queue));
   const [busy, setBusy] = useState(false);
