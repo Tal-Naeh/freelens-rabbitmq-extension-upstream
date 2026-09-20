@@ -3,7 +3,7 @@
 import { render, unmountComponentAtNode } from "react-dom";
 import { act } from "react-dom/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SelectionStore, useDeferredOpen, useSelectionParam, useStoredPageParam } from "./hooks";
+import { SelectionStore, useDeferredOpen, useResource, useSelectionParam, useStoredPageParam } from "./hooks";
 
 import type { Renderer } from "@freelensapp/extensions";
 
@@ -148,6 +148,64 @@ describe("useStoredPageParam", () => {
     act(() => render(<StoredProbe param={deep.param} store={store} />, container));
     expect(container.textContent).toBe("c");
     expect(store.get("target:test")).toBe("c");
+  });
+});
+
+let latestResource: { data?: number; loading: boolean; reload: () => void };
+
+function ResourceProbe({ loader, refreshMs }: { loader: () => Promise<number>; refreshMs?: number }) {
+  const res = useResource("queue:test", loader, { refreshMs });
+  latestResource = res;
+  return <div>{res.data === undefined ? "loading" : `messages:${res.data}`}</div>;
+}
+
+describe("useResource", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("polls when refreshMs is set, so a stale count after a purge corrects itself (#39)", async () => {
+    // Broker statistics lag: the first two reads still report the old count, the third the real one.
+    const counts = [5, 5, 0];
+    const loader = vi.fn(() => Promise.resolve(counts[Math.min(loader.mock.calls.length - 1, counts.length - 1)]));
+    act(() => render(<ResourceProbe loader={loader} refreshMs={5_000} />, container));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(container.textContent).toBe("messages:5");
+    // The reload right after the purge lands inside the stale window.
+    await act(async () => {
+      latestResource.reload();
+      await Promise.resolve();
+    });
+    expect(container.textContent).toBe("messages:5");
+    // The next periodic refresh picks up the corrected statistics.
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+      await Promise.resolve();
+    });
+    expect(container.textContent).toBe("messages:0");
+    expect(loader).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the previous data visible while a refresh is in flight", async () => {
+    let resolveSecond: (n: number) => void = () => {};
+    const loader = vi
+      .fn<() => Promise<number>>()
+      .mockResolvedValueOnce(5)
+      .mockImplementationOnce(() => new Promise((r) => (resolveSecond = r)));
+    act(() => render(<ResourceProbe loader={loader} refreshMs={5_000} />, container));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(container.textContent).toBe("messages:5");
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(latestResource.loading).toBe(true);
+    expect(container.textContent).toBe("messages:5");
+    await act(async () => {
+      resolveSecond(0);
+      await Promise.resolve();
+    });
+    expect(container.textContent).toBe("messages:0");
   });
 });
 
