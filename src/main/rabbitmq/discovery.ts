@@ -63,6 +63,20 @@ export function versionFromImage(image: string | undefined): string | undefined 
   return m ? m[1] : tag;
 }
 
+/**
+ * The Management API port *number* on the client Service, for display: the named port stays the
+ * tunnel target, the number is what users recognise (15672/15671). Falls back to the well-known
+ * number when the Service is not found. Pure.
+ */
+export function managementPortNumber(service: KubeObject | undefined, portName: string, tls: boolean): number {
+  const ports = (service?.spec?.ports ?? []) as ServicePort[];
+  const byName = ports.find((p) => p.name === portName && typeof p.port === "number");
+  if (byName?.port !== undefined) return byName.port;
+  const byNumber = ports.find((p) => p.port !== undefined && MANAGEMENT_PORTS.has(p.port));
+  if (byNumber?.port !== undefined) return byNumber.port;
+  return tls ? RABBITMQ_MANAGEMENT_TLS_PORT : RABBITMQ_MANAGEMENT_PORT;
+}
+
 /** Parse a RabbitMQ Cluster Operator `RabbitmqCluster` CR into a discovered target. Pure. */
 export function parseRabbitmqCluster(cr: KubeObject, services: KubeObject[]): DiscoveredRabbitmqInfo | undefined {
   const name = cr.metadata?.name;
@@ -79,6 +93,7 @@ export function parseRabbitmqCluster(cr: KubeObject, services: KubeObject[]): Di
     services.find((s) => s.metadata?.namespace === namespace && s.metadata?.name === name) ??
     services.find((s) => s.metadata?.namespace === namespace && s.metadata?.name === `${name}-client`);
 
+  const managementPortName = managementTls ? "management-tls" : "management";
   const defaultUserSecret: string = cr.status?.defaultUser?.secretReference?.name ?? `${name}-default-user`;
   const conditions = ((cr.status?.conditions ?? []) as any[]).map((c) => ({
     type: String(c.type ?? ""),
@@ -94,7 +109,8 @@ export function parseRabbitmqCluster(cr: KubeObject, services: KubeObject[]): Di
     provider: "RabbitMQ Cluster Operator",
     podSelector: `app.kubernetes.io/name=${name}`,
     serviceName: service?.metadata?.name,
-    managementPort: managementTls ? "management-tls" : "management",
+    managementPort: managementPortName,
+    managementPortNumber: managementPortNumber(service, managementPortName, managementTls),
     managementTls,
     amqpPort: nonTlsDisabled ? RABBITMQ_AMQPS_PORT : RABBITMQ_AMQP_PORT,
     amqpTls: tlsEnabled,
@@ -246,6 +262,8 @@ export function parseServiceTarget(
     serviceName: name,
     managementPort:
       mgmt.targetPort ?? mgmt.port ?? (managementTls ? RABBITMQ_MANAGEMENT_TLS_PORT : RABBITMQ_MANAGEMENT_PORT),
+    managementPortNumber:
+      typeof mgmt.port === "number" ? mgmt.port : typeof mgmt.targetPort === "number" ? mgmt.targetPort : undefined,
     managementTls,
     amqpPort: typeof amqp?.port === "number" ? amqp.port : undefined,
     amqpTls,

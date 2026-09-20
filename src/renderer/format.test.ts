@@ -1,7 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatDuration, formatRate, matchesQuery, prettyJson, shortNodeName } from "./format";
+import {
+  formatBytes,
+  formatDuration,
+  formatManagementPort,
+  formatRate,
+  matchesQuery,
+  prettyJson,
+  shortNodeName,
+} from "./format";
 
 describe("format", () => {
+  it("prints the management port number with the tunnel name in brackets (#40)", () => {
+    expect(formatManagementPort("management", 15672)).toBe("15672 (management)");
+    expect(formatManagementPort("stats", 15672)).toBe("15672 (stats)");
+    expect(formatManagementPort(15672, 15672)).toBe("15672");
+    expect(formatManagementPort("management", undefined)).toBe("management");
+    expect(formatManagementPort(15671, undefined)).toBe("15671");
+  });
   it("formats bytes and rates", () => {
     expect(formatBytes(0)).toBe("0 B");
     expect(formatBytes(1536)).toBe("1.5 KiB");

@@ -1,7 +1,7 @@
 import { Renderer } from "@freelensapp/extensions";
 import { useMemo } from "react";
 import { EmptyState, ErrorPanel, LoadingState, PageShell, SearchBox, Toolbar } from "../components/page-shell";
-import { matchesQuery } from "../format";
+import { formatManagementPort, matchesQuery } from "../format";
 import { usePageParam } from "../hooks";
 import { RABBITMQ_PAGE_IDS } from "../navigation";
 import { useTargetPage } from "./page-deps";
@@ -107,7 +107,7 @@ export function ClustersPage(props: ClustersPageProps) {
                 <div>
                   <dt>Management</dt>
                   <dd>
-                    {String(t.managementPort)}
+                    {formatManagementPort(t.managementPort, t.managementPortNumber)}
                     {t.managementTls ? " (TLS)" : ""}
                   </dd>
                 </div>

@@ -136,7 +136,8 @@ export function OverviewPage(props: OverviewPageProps) {
         {
           label: "Ready",
           value: formatNumber(data.queueTotals.ready),
-          tone: data.queueTotals.ready > 0 ? "warning" : undefined,
+          // Messages waiting for a consumer are normal; only flag them when nothing consumes at all (#40).
+          tone: data.queueTotals.ready > 0 && data.totals.consumers === 0 ? "warning" : undefined,
         },
         { label: "Unacked", value: formatNumber(data.queueTotals.unacknowledged) },
       ]
