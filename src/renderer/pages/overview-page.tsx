@@ -142,6 +142,10 @@ export function OverviewPage(props: OverviewPageProps) {
         { label: "Unacked", value: formatNumber(data.queueTotals.unacknowledged) },
       ]
     : [];
+  const unroutableRate =
+    data && (data.rates.returnUnroutable.rate !== undefined || data.rates.dropUnroutable.rate !== undefined)
+      ? (data.rates.returnUnroutable.rate ?? 0) + (data.rates.dropUnroutable.rate ?? 0)
+      : undefined;
   const rates: Metric[] = data
     ? [
         { label: "Publish", value: formatRate(data.rates.publish.rate) },
@@ -155,8 +159,9 @@ export function OverviewPage(props: OverviewPageProps) {
         { label: "Confirm", value: formatRate(data.rates.confirm.rate) },
         {
           label: "Unroutable",
-          value: formatRate(data.rates.returnUnroutable.rate),
-          tone: (data.rates.returnUnroutable.rate ?? 0) > 0 ? "error" : undefined,
+          // Dropped (non-mandatory) plus returned (mandatory) publishes that matched no binding.
+          value: formatRate(unroutableRate),
+          tone: (unroutableRate ?? 0) > 0 ? "error" : undefined,
         },
       ]
     : [];
