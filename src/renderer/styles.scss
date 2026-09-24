@@ -377,6 +377,8 @@
 }
 
 .RmqTabs {
+  // The page is a full-height flex column; without this a long table squeezes the tab strip to nothing.
+  flex: 0 0 auto;
   border-bottom: 1px solid var(--rmq-border);
 }
 
