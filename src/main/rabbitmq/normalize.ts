@@ -72,6 +72,8 @@ export function toQueueSummary(raw: Raw): QueueSummaryDto {
     ack: rate(stats, "ack"),
     redeliver: rate(stats, "redeliver"),
     idleSince: raw.idle_since ? String(raw.idle_since) : undefined,
+    members: Array.isArray(raw.members) ? raw.members.map(String) : undefined,
+    online: Array.isArray(raw.online) ? raw.online.map(String) : undefined,
     arguments: typeof raw.arguments === "object" && raw.arguments ? raw.arguments : {},
   };
 }

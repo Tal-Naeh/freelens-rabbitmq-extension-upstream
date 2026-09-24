@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Health** page: runs read-only checks against the selected cluster and lists what needs attention, critical first, each with a link to the queue, channel or node concerned. It flags nodes that are down or partitioned, memory and disk alarms and the headroom before them, file descriptors, sockets and Erlang processes near their limits, crashed or minority queues, quorum queues with offline or too few replicas, backlogs with no consumers (dead-letter queues reported as info, streams skipped), growing backlogs, low consumer capacity, redeliveries, channels that stay full to their prefetch with no acks for five minutes or hold unacked messages without a prefetch limit, and unroutable publishes, dropped or returned. It refreshes every 15 seconds from the overview, queues and channels endpoints the other pages already use.
+- Queue summaries carry the quorum and stream replica lists (`members`, `online`), and the overview carries the dropped unroutable rate (`drop_unroutable`) next to the returned one.
+
 ## v0.3.1 - 2026-09-20
 
 ### Changed
