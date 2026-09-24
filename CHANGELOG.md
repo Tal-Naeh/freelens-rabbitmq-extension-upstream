@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Dead letters in the Message Inspector**: dead-letter headers (`x-death`, `x-first-death-*`) are decoded for every peeked message: the reason in plain words (rejected, expired, maxlen, delivery_limit), the queue it died in, how many times, the full history for messages that were dead-lettered more than once, and the exchange and routing key it was first published to. A summary above the messages counts them by reason and by queue, and the peeked messages can be searched (payload, routing key, properties, headers) and filtered by reason. Read-only; nothing changes on the broker.
+
+### Fixed
+
+- The Message Inspector no longer keeps the previous queue's peeked messages when the queue drawer switches to another queue.
+
 ## v0.3.1 - 2026-09-20
 
 ### Changed

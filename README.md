@@ -29,6 +29,8 @@ cluster sidebar under **RabbitMQ**: **Clusters**, **Overview**, **Queues**,
 
 ![Overview](docs/screenshots/overview.png)
 
+![Dead letters](docs/screenshots/dead-letters.png)
+
 The extension is modelled on the
 [freelens-kafka-extension](https://github.com/freelensapp/freelens-kafka-extension)
 architecture, tailored for RabbitMQ.
@@ -114,7 +116,13 @@ offers a username and password form.
     per-node memory, disk and file descriptor gauges and alarms.
   - *Queues*: sortable table (ready, unacked, total, consumers, publish and
     deliver rates, memory, features) with a detail drawer: definition,
-    bindings, consumers and the **Message Inspector**.
+    bindings, consumers and the **Message Inspector**. The inspector decodes
+    dead-letter headers (`x-death`): each dead-lettered message shows why it
+    failed (rejected, expired, maxlen, delivery_limit), the queue it died in,
+    how many times, and the exchange and routing key it was first published
+    to. A summary counts the peeked messages by reason and queue, and the
+    messages can be searched (payload, routing key, headers) and filtered by
+    reason.
   - *Exchanges*: table with publish in and out rates, drawer with outgoing
     and incoming bindings and a Publish form.
   - *Connections*: live tabs for connections, channels (prefetch, unacked,
