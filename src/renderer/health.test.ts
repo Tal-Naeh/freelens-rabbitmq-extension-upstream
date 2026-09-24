@@ -329,6 +329,35 @@ describe("analyzeHealth", () => {
     expect(findings[0].detail).toContain("Offline: r-server-1, r-server-2.");
   });
 
+  it("folds replicas on a stopped node into that node's finding", () => {
+    const members = [
+      "rabbit@b-server-0.b-nodes.shop",
+      "rabbit@b-server-1.b-nodes.shop",
+      "rabbit@b-server-2.b-nodes.shop",
+    ];
+    const online = members.slice(0, 2);
+    const findings = analyzeHealth({
+      overview: overview([
+        node({ name: members[0] }),
+        node({ name: members[1] }),
+        node({ name: members[2], running: false }),
+      ]),
+      queues: ["a", "b", "c"].map((name) => queue({ name, type: "quorum", members, online })),
+      channels: [],
+    });
+    expect(findings.map((f) => f.rule)).toEqual(["node-down"]);
+    expect(findings[0].title).toBe("Node b-server-2 is not running");
+    expect(findings[0].detail).toContain("3 queues have a replica here");
+    // A replica offline on a node that reports running is still flagged per queue.
+    expect(
+      rules({
+        overview: overview([node({ name: members[0] }), node({ name: members[1] }), node({ name: members[2] })]),
+        queues: [queue({ type: "quorum", members, online })],
+        channels: [],
+      }),
+    ).toEqual(["replicas-offline"]);
+  });
+
   it("sorts critical first and counts by severity", () => {
     const findings = analyzeHealth({
       overview: overview([node({ memAlarm: true })]),

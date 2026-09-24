@@ -93,9 +93,11 @@ function pct(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+/** `rabbit@orders-broker-server-0.orders-broker-nodes.shop` -> `orders-broker-server-0`; IP hosts stay whole. */
 function shortNode(name: string): string {
   const at = name.indexOf("@");
-  return at >= 0 ? name.slice(at + 1) : name;
+  const host = at >= 0 ? name.slice(at + 1) : name;
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ? host : host.split(".")[0];
 }
 
 function queueLabel(q: QueueSummaryDto): string {
@@ -183,7 +185,12 @@ function nodeFindings(node: NodeDto): HealthFinding[] {
   return out;
 }
 
-function queueFindings(q: QueueSummaryDto, runningNodes: number, dlqTargets: Set<string>): HealthFinding[] {
+function queueFindings(
+  q: QueueSummaryDto,
+  runningNodes: number,
+  downNodes: Set<string>,
+  dlqTargets: Set<string>,
+): HealthFinding[] {
   const out: HealthFinding[] = [];
   const subject: HealthSubject = { kind: "queue", vhost: q.vhost, name: q.name };
   const add = (rule: string, severity: HealthSeverity, category: HealthCategory, title: string, detail: string) =>
@@ -211,7 +218,9 @@ function queueFindings(q: QueueSummaryDto, runningNodes: number, dlqTargets: Set
         ? "Fewer than a majority of its replicas are online, so it cannot accept writes."
         : "The queue is not available on its node.") + offlineText,
     );
-  } else if (offline.length > 0 && q.members) {
+  } else if (offline.some((m) => !downNodes.has(m)) && q.members) {
+    // Replicas on a node reported as down are counted in that node's finding instead, so one
+    // stopped node does not produce a warning per quorum queue.
     add(
       "replicas-offline",
       "warning",
@@ -398,8 +407,17 @@ export function analyzeHealth({
   }
 
   const runningNodes = overview.nodes.filter((n) => n.running).length;
+  const downNodes = new Set(overview.nodes.filter((n) => !n.running).map((n) => n.name));
+  for (const f of findings) {
+    if (f.rule !== "node-down" || f.subject.kind !== "node") continue;
+    const node = f.subject.name;
+    const affected = queues.filter((q) => q.members?.includes(node) && !q.online?.includes(node)).length;
+    if (affected > 0) {
+      f.detail = `${plural(affected, "queue")} ${affected === 1 ? "has" : "have"} a replica here and ${affected === 1 ? "runs" : "run"} with one fewer; queues led only by this node are unavailable.`;
+    }
+  }
   const dlqTargets = deadLetterTargets(queues);
-  for (const q of queues) findings.push(...queueFindings(q, runningNodes, dlqTargets));
+  for (const q of queues) findings.push(...queueFindings(q, runningNodes, downNodes, dlqTargets));
   for (const ch of channels) findings.push(...channelFindings(ch, stuckSince, now));
 
   return findings.sort(
