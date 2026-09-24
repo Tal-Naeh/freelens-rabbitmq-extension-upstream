@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Clients** tab on the Connections page: groups the connections by the workload (Deployment, StatefulSet…) or the pod that opened them, busiest first, with each client's connections, share of the total, channels, client library, traffic and the age of its oldest connection. A client that holds most of the broker's connections, such as a leaking connection pool, stands out as one row instead of thousands. Peer addresses are matched to pod IPs through the Freelens cluster connection (a pod behind a ReplicaSet is reported as its Deployment); addresses that match no pod, and loopback addresses from a service-mesh sidecar, are labelled as such. A workload row opens exactly its pods, a pod row its connections.
+
 ## v0.3.1 - 2026-09-20
 
 ### Changed

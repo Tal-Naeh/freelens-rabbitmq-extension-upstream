@@ -25,3 +25,6 @@ export const RABBITMQ_PEEK_DEFAULT_COUNT = 10;
 export const RABBITMQ_PEEK_TRUNCATE_BYTES = 64 * 1024;
 /** Auto-refresh interval for live views (connections/channels/overview). */
 export const RABBITMQ_LIVE_REFRESH_MS = 5_000;
+/** Client addresses resolved to pods per request, and how often the Clients view re-resolves them. */
+export const RABBITMQ_CLIENT_PODS_MAX_IPS = 5_000;
+export const RABBITMQ_CLIENT_PODS_REFRESH_MS = 60_000;

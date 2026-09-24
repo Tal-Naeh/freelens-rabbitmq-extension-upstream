@@ -1,6 +1,8 @@
 import { Renderer } from "@freelensapp/extensions";
 import {
   type ChannelsDto,
+  type ClientPodDto,
+  type ClientPodsRequest,
   type ConnectionsDto,
   type ConsumersDto,
   type CredentialsClearRequest,
@@ -85,6 +87,9 @@ export class RabbitmqIpcRenderer extends Renderer.Ipc {
   }
   deleteExchange(request: DeleteExchangeRequest): Promise<WriteResultDto> {
     return this.invoke(RABBITMQ_IPC.deleteExchange, request);
+  }
+  clientPods(request: ClientPodsRequest): Promise<ClientPodDto[]> {
+    return this.invoke(RABBITMQ_IPC.clientPods, request);
   }
   disconnect(request: DisconnectRequest): Promise<WriteResultDto> {
     return this.invoke(RABBITMQ_IPC.disconnect, request);

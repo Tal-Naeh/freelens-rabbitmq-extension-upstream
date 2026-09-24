@@ -22,6 +22,7 @@ export const RABBITMQ_IPC = {
   deleteQueue: "rabbitmq:delete-queue",
   deleteExchange: "rabbitmq:delete-exchange",
   disconnect: "rabbitmq:disconnect",
+  clientPods: "rabbitmq:client-pods",
   progress: "rabbitmq:progress",
 } as const;
 
@@ -143,6 +144,22 @@ export interface DeleteQueueRequest extends QueueRequest {
 }
 export interface DeleteExchangeRequest extends ExchangeRequest {
   ifUnused?: boolean;
+}
+
+/** Resolve AMQP client addresses (connection peer hosts) to the pods that own them. */
+export interface ClientPodsRequest {
+  clusterId?: string;
+  ips: string[];
+}
+
+export interface ClientPodDto {
+  ip: string;
+  pod: string;
+  namespace: string;
+  /** The controller behind the pod: Deployment (resolved through its ReplicaSet), StatefulSet, DaemonSet, Job… */
+  workloadKind?: string;
+  workload?: string;
+  node?: string;
 }
 
 export interface DisconnectRequest {
