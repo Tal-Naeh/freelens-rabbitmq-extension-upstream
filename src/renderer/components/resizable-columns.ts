@@ -68,6 +68,17 @@ export function columnStyle(spec: ColumnSpec, override: number | undefined): CSS
     : { flex: `0 0 ${spec.width}px`, width: spec.width, minWidth: min };
 }
 
+/**
+ * Classes for a column's cells: `RmqNum` right-aligns numbers; `RmqGrow` marks the column that
+ * takes the leftover width (only while the user has not resized it), so the row width can be
+ * measured without that column's text. Pure.
+ */
+export function columnClassName(spec: ColumnSpec, override: number | undefined, className?: string): string {
+  return [className, spec.numeric ? "RmqNum" : "", spec.grow && override === undefined ? "RmqGrow" : ""]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export interface ResizableColumns {
   /** Props for the `<TableHead>` cell of a column (adds the drag handle). */
   head(
@@ -174,7 +185,7 @@ export function useResizableColumns(
         const spec = byId.get(id) ?? { id, width: 120 };
         return {
           id: `${tableId}:${id}`,
-          className: [className, spec.numeric ? "RmqNum" : ""].filter(Boolean).join(" "),
+          className: columnClassName(spec, widths[id], className),
           style: columnStyle(spec, widths[id]),
           resizable: true,
           onResizeStart: (event: MouseEvent) => start(id, event),
@@ -184,7 +195,7 @@ export function useResizableColumns(
       cell(id, className) {
         const spec = byId.get(id) ?? { id, width: 120 };
         return {
-          className: [className, spec.numeric ? "RmqNum" : ""].filter(Boolean).join(" "),
+          className: columnClassName(spec, widths[id], className),
           style: columnStyle(spec, widths[id]),
         };
       },

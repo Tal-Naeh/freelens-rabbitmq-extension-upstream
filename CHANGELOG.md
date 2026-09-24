@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Tables that scroll sideways (a narrow window, or zoomed in) no longer cut their rows short: the row background, borders and header now continue under every column instead of stopping at the visible edge. The growing column (Name, Client...) is measured at its minimum width, so long names do not widen the rows.
+
 ## v0.3.1 - 2026-09-20
 
 ### Changed

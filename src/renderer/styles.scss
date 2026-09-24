@@ -596,10 +596,15 @@
     border-radius: 8px;
   }
 
-  /* Header and rows must share identical horizontal padding or columns drift. Core pads rows 0 8px, header 0. */
+  /* Header and rows must share identical horizontal padding or columns drift. Core pads rows 0 8px, header 0.
+     Rows are at least as wide as their columns, so when the table scrolls sideways (narrow window,
+     zoom) the row background and borders continue under every cell instead of stopping at the
+     visible edge. The growing column is measured without its text (see .RmqGrow below), otherwise
+     a long name would widen every row. */
   .TableHead,
   .TableRow {
     padding: 0 8px;
+    min-width: max-content;
   }
   .TableRow {
     border-bottom: 1px solid var(--rmq-border);
@@ -630,6 +635,11 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* The growing column contributes only its min-width to the row's measured width. */
+  .TableCell.RmqGrow {
+    contain: inline-size;
   }
 
   /* Numeric columns: right-align header text AND values with the same right padding; sort icon moves left. */
