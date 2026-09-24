@@ -29,6 +29,8 @@ cluster sidebar under **RabbitMQ**: **Clusters**, **Overview**, **Health**,
 
 ![Overview](docs/screenshots/overview.png)
 
+![Health](docs/screenshots/health.png)
+
 The extension is modelled on the
 [freelens-kafka-extension](https://github.com/freelensapp/freelens-kafka-extension)
 architecture, tailored for RabbitMQ.
