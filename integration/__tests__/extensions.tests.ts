@@ -261,6 +261,38 @@ clusterDescribe("RabbitMQ cluster pages", () => {
   );
 
   it(
+    "runs the Health checks against the fixture broker",
+    async () => {
+      console.log("await openRabbitmqMenuItem rabbitmq-health");
+      await openRabbitmqMenuItem(frame, "rabbitmq-health");
+
+      // The severity strip renders once overview, queues and channels have loaded and been analyzed.
+      // Select it by its label: the menu click does not wait, and the Overview strip may still be on screen.
+      const metrics = frame.locator('.RmqMetrics[aria-label="Findings by severity"]');
+      await metrics.waitFor({ state: "visible", timeout: 180_000 });
+      expect(await frame.locator(".RmqErrorHead").count()).toBe(0);
+      expect((await metrics.textContent()) ?? "").toContain("Queues checked");
+    },
+    5 * 60 * 1000,
+  );
+
+  it(
+    "groups the fixture broker's connections on the Connections > Clients tab",
+    async () => {
+      console.log("await openRabbitmqMenuItem rabbitmq-connections");
+      await openRabbitmqMenuItem(frame, "rabbitmq-connections");
+      await frame.locator(".RmqTabs", { hasText: "Clients" }).getByText("Clients", { exact: true }).click();
+
+      // The clients summary renders once connections are loaded and their addresses matched to pods.
+      const metrics = frame.locator('.RmqMetrics[aria-label="clients summary"]');
+      await metrics.waitFor({ state: "visible", timeout: 180_000 });
+      expect(await frame.locator(".RmqErrorHead").count()).toBe(0);
+      expect((await metrics.textContent()) ?? "").toContain("Busiest client");
+    },
+    5 * 60 * 1000,
+  );
+
+  it(
     "keeps the renderer and the main process free of RabbitMQ errors",
     async () => {
       const rabbitmqErrors = [...errors.errorLogs, ...errors.processErrorLogs].filter((line) => /rabbitmq/i.test(line));

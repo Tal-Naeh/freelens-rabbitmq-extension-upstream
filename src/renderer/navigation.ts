@@ -4,6 +4,7 @@ export const RABBITMQ_PAGE_IDS = {
   queues: "rabbitmq-queues",
   exchanges: "rabbitmq-exchanges",
   connections: "rabbitmq-connections",
+  health: "rabbitmq-health",
 } as const;
 
 export type RabbitmqPageId = (typeof RABBITMQ_PAGE_IDS)[keyof typeof RABBITMQ_PAGE_IDS];
@@ -15,6 +16,7 @@ export const RABBITMQ_MENU_IDS = {
   queues: "rabbitmq-queues",
   exchanges: "rabbitmq-exchanges",
   connections: "rabbitmq-connections",
+  health: "rabbitmq-health",
 } as const;
 
 /** Declarative page registrations: id + default URL params. */
@@ -24,6 +26,7 @@ export const RABBITMQ_CLUSTER_PAGE_MANIFEST = [
   { id: RABBITMQ_PAGE_IDS.queues, params: { target: "", vhost: "", query: "", queue: "", view: "overview" } },
   { id: RABBITMQ_PAGE_IDS.exchanges, params: { target: "", vhost: "", query: "", exchange: "" } },
   { id: RABBITMQ_PAGE_IDS.connections, params: { target: "", query: "", view: "connections" } },
+  { id: RABBITMQ_PAGE_IDS.health, params: { target: "" } },
 ] as const;
 
 export const RABBITMQ_CLUSTER_MENU_MANIFEST = [
@@ -40,6 +43,7 @@ export const RABBITMQ_CLUSTER_MENU_MANIFEST = [
     title: "Overview",
     pageId: RABBITMQ_PAGE_IDS.overview,
   },
+  { id: RABBITMQ_MENU_IDS.health, parentId: RABBITMQ_MENU_IDS.root, title: "Health", pageId: RABBITMQ_PAGE_IDS.health },
   { id: RABBITMQ_MENU_IDS.queues, parentId: RABBITMQ_MENU_IDS.root, title: "Queues", pageId: RABBITMQ_PAGE_IDS.queues },
   {
     id: RABBITMQ_MENU_IDS.exchanges,

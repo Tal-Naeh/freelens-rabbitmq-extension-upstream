@@ -6,6 +6,7 @@ import { RABBITMQ_CLUSTER_MENU_MANIFEST, RABBITMQ_CLUSTER_PAGE_MANIFEST, type Ra
 import { ClustersPage, type ClustersPageProps } from "./pages/clusters-page";
 import { ConnectionsPage, type ConnectionsPageProps } from "./pages/connections-page";
 import { ExchangesPage, type ExchangesPageProps } from "./pages/exchanges-page";
+import { HealthPage, type HealthPageProps } from "./pages/health-page";
 import { OverviewPage, type OverviewPageProps } from "./pages/overview-page";
 import { QueuesPage, type QueuesPageProps } from "./pages/queues-page";
 import { WriteModeStore } from "./write-mode-store";
@@ -68,6 +69,12 @@ export default class RabbitmqExtensionRenderer extends Renderer.LensExtension {
       ...RABBITMQ_CLUSTER_PAGE_MANIFEST[4],
       components: {
         Page: ({ params }: Pick<ConnectionsPageProps, "params">) => <ConnectionsPage {...this.deps} params={params} />,
+      },
+    },
+    {
+      ...RABBITMQ_CLUSTER_PAGE_MANIFEST[5],
+      components: {
+        Page: ({ params }: Pick<HealthPageProps, "params">) => <HealthPage {...this.deps} params={params} />,
       },
     },
   ];

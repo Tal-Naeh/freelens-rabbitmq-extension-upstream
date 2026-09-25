@@ -22,12 +22,16 @@ cluster you are connected to, reads their credentials from the Secrets the
 operator or the chart created, opens a port-forward to the Management API and
 lets you inspect queues, exchanges, bindings, connections, channels,
 consumers and messages, **read-only by default**. Everything lives in the
-cluster sidebar under **RabbitMQ**: **Clusters**, **Overview**, **Queues**,
-**Exchanges** and **Connections**.
+cluster sidebar under **RabbitMQ**: **Clusters**, **Overview**, **Health**,
+**Queues**, **Exchanges** and **Connections**.
 
 ![Queues](docs/screenshots/queues.png)
 
 ![Overview](docs/screenshots/overview.png)
+
+![Health](docs/screenshots/health.png)
+
+![Dead letters](docs/screenshots/dead-letters.png)
 
 The extension is modelled on the
 [freelens-kafka-extension](https://github.com/freelensapp/freelens-kafka-extension)
@@ -84,8 +88,8 @@ You can also build and pack the extension yourself, see
    cluster's left sidebar.
 2. Open **Clusters**. It lists what discovery found, with provider, version,
    replicas, ports and credential source. Click **Open** on a target.
-3. Browse **Overview**, **Queues**, **Exchanges** and **Connections**. Pick a
-   different target from the header selector.
+3. Browse **Overview**, **Health**, **Queues**, **Exchanges** and
+   **Connections**. Pick a different target from the header selector.
 4. To peek at messages: open a queue, then the **Messages** tab, then
    **Peek**. Nothing is consumed.
 5. To mutate: switch **Read-only** to **Write Mode** in the header, confirm,
@@ -112,13 +116,30 @@ offers a username and password form.
     ports and credential source.
   - *Overview*: object totals, message rates, cluster and session facts,
     per-node memory, disk and file descriptor gauges and alarms.
+  - *Health*: read-only checks that list what needs attention, critical
+    first: resource alarms and the headroom before them, partitions, crashed
+    or minority queues, quorum queues with offline or missing replicas,
+    backlogs with no consumers, growing backlogs, redeliveries, consumers
+    stuck at their prefetch and unroutable publishes. Each finding links to
+    the queue, channel or node concerned; **What is checked** lists every
+    rule and threshold.
   - *Queues*: sortable table (ready, unacked, total, consumers, publish and
     deliver rates, memory, features) with a detail drawer: definition,
-    bindings, consumers and the **Message Inspector**.
+    bindings, consumers and the **Message Inspector**. The inspector decodes
+    dead-letter headers (`x-death`): each dead-lettered message shows why it
+    failed (rejected, expired, maxlen, delivery_limit), the queue it died in,
+    how many times, and the exchange and routing key it was first published
+    to. A summary counts the peeked messages by reason and queue, and the
+    messages can be searched (payload, routing key, headers) and filtered by
+    reason.
   - *Exchanges*: table with publish in and out rates, drawer with outgoing
     and incoming bindings and a Publish form.
   - *Connections*: live tabs for connections, channels (prefetch, unacked,
-    confirm and tx mode) and consumers.
+    confirm and tx mode) and consumers, and a **Clients** tab that groups the
+    connections by the workload or pod that opened them, busiest first, with
+    each client's share of all connections. Peer addresses are matched to pod
+    IPs through the Freelens cluster connection; addresses that match no pod
+    are shown as they are.
 - **Resizable columns**: drag the right edge of any table header to resize,
   double-click it to reset; widths are remembered per table.
 - **Safety first**
@@ -159,6 +180,11 @@ One session (tunnel and client) per target, reused across pages, closed after
   without one the certificate of the pod is accepted inside the port-forward.
 - Brokers are reached through a port-forward to one Ready pod of the target,
   so a target without port-forwardable pods cannot be opened.
+- The **Clients** tab names a client only when the broker sees the pod's own
+  address. Behind a service-mesh sidecar (Istio, Linkerd) every client
+  arrives from a loopback address, shown as one "Loopback proxy" row; behind
+  NAT or a node port it shows the node or gateway address. Naming clients
+  lists the pods of the whole cluster, so it needs permission to list pods.
 
 ## Development
 

@@ -22,6 +22,7 @@ export const RABBITMQ_IPC = {
   deleteQueue: "rabbitmq:delete-queue",
   deleteExchange: "rabbitmq:delete-exchange",
   disconnect: "rabbitmq:disconnect",
+  clientPods: "rabbitmq:client-pods",
   progress: "rabbitmq:progress",
 } as const;
 
@@ -145,6 +146,22 @@ export interface DeleteExchangeRequest extends ExchangeRequest {
   ifUnused?: boolean;
 }
 
+/** Resolve AMQP client addresses (connection peer hosts) to the pods that own them. */
+export interface ClientPodsRequest {
+  clusterId?: string;
+  ips: string[];
+}
+
+export interface ClientPodDto {
+  ip: string;
+  pod: string;
+  namespace: string;
+  /** The controller behind the pod: Deployment (resolved through its ReplicaSet), StatefulSet, DaemonSet, Job… */
+  workloadKind?: string;
+  workload?: string;
+  node?: string;
+}
+
 export interface DisconnectRequest {
   clusterId?: string;
   targetId?: string;
@@ -206,7 +223,10 @@ export interface OverviewDto {
     ack: RateDto;
     redeliver: RateDto;
     confirm: RateDto;
+    /** Unroutable mandatory publishes, returned to the publisher. */
     returnUnroutable: RateDto;
+    /** Unroutable non-mandatory publishes, dropped by the broker. */
+    dropUnroutable: RateDto;
   };
   nodes: NodeDto[];
   /** Whether the current credentials may write (used to inform the UI; writes are still gated). */
@@ -243,6 +263,9 @@ export interface QueueSummaryDto {
   ack: RateDto;
   redeliver: RateDto;
   idleSince?: string;
+  /** Quorum and stream queues: the nodes hosting a replica, and those of them currently online. */
+  members?: string[];
+  online?: string[];
   arguments: Record<string, unknown>;
 }
 

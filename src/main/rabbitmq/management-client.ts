@@ -99,6 +99,7 @@ export class RabbitmqManagementClient {
         redeliver: rate(stats, "redeliver"),
         confirm: rate(stats, "confirm"),
         returnUnroutable: rate(stats, "return_unroutable"),
+        dropUnroutable: rate(stats, "drop_unroutable"),
       },
     };
   }
@@ -141,6 +142,9 @@ export class RabbitmqManagementClient {
   /**
    * Peek at messages WITHOUT consuming them: `ackmode: ack_requeue_true` makes the broker
    * re-queue every fetched message. Note this still counts as a delivery (redelivered flag set).
+   * Never switch to `reject_requeue_true`: on a quorum queue a reject counts toward the delivery
+   * limit (default 20 in RabbitMQ 4.x), so repeated peeks would dead-letter or drop the head
+   * messages. `ack_requeue_true` does not (15 peeks against x-delivery-limit=2, RabbitMQ 4.3.5).
    */
   async peekMessages(vhost: string, queue: string, count: number): Promise<MessagesPeekDto> {
     const bounded = Math.max(1, Math.min(RABBITMQ_PEEK_MAX_COUNT, Math.floor(count)));
