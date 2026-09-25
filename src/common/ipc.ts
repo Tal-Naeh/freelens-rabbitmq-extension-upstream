@@ -223,7 +223,10 @@ export interface OverviewDto {
     ack: RateDto;
     redeliver: RateDto;
     confirm: RateDto;
+    /** Unroutable mandatory publishes, returned to the publisher. */
     returnUnroutable: RateDto;
+    /** Unroutable non-mandatory publishes, dropped by the broker. */
+    dropUnroutable: RateDto;
   };
   nodes: NodeDto[];
   /** Whether the current credentials may write (used to inform the UI; writes are still gated). */
@@ -260,6 +263,9 @@ export interface QueueSummaryDto {
   ack: RateDto;
   redeliver: RateDto;
   idleSince?: string;
+  /** Quorum and stream queues: the nodes hosting a replica, and those of them currently online. */
+  members?: string[];
+  online?: string[];
   arguments: Record<string, unknown>;
 }
 

@@ -22,12 +22,14 @@ cluster you are connected to, reads their credentials from the Secrets the
 operator or the chart created, opens a port-forward to the Management API and
 lets you inspect queues, exchanges, bindings, connections, channels,
 consumers and messages, **read-only by default**. Everything lives in the
-cluster sidebar under **RabbitMQ**: **Clusters**, **Overview**, **Queues**,
-**Exchanges** and **Connections**.
+cluster sidebar under **RabbitMQ**: **Clusters**, **Overview**, **Health**,
+**Queues**, **Exchanges** and **Connections**.
 
 ![Queues](docs/screenshots/queues.png)
 
 ![Overview](docs/screenshots/overview.png)
+
+![Health](docs/screenshots/health.png)
 
 The extension is modelled on the
 [freelens-kafka-extension](https://github.com/freelensapp/freelens-kafka-extension)
@@ -84,8 +86,8 @@ You can also build and pack the extension yourself, see
    cluster's left sidebar.
 2. Open **Clusters**. It lists what discovery found, with provider, version,
    replicas, ports and credential source. Click **Open** on a target.
-3. Browse **Overview**, **Queues**, **Exchanges** and **Connections**. Pick a
-   different target from the header selector.
+3. Browse **Overview**, **Health**, **Queues**, **Exchanges** and
+   **Connections**. Pick a different target from the header selector.
 4. To peek at messages: open a queue, then the **Messages** tab, then
    **Peek**. Nothing is consumed.
 5. To mutate: switch **Read-only** to **Write Mode** in the header, confirm,
@@ -112,6 +114,13 @@ offers a username and password form.
     ports and credential source.
   - *Overview*: object totals, message rates, cluster and session facts,
     per-node memory, disk and file descriptor gauges and alarms.
+  - *Health*: read-only checks that list what needs attention, critical
+    first: resource alarms and the headroom before them, partitions, crashed
+    or minority queues, quorum queues with offline or missing replicas,
+    backlogs with no consumers, growing backlogs, redeliveries, consumers
+    stuck at their prefetch and unroutable publishes. Each finding links to
+    the queue, channel or node concerned; **What is checked** lists every
+    rule and threshold.
   - *Queues*: sortable table (ready, unacked, total, consumers, publish and
     deliver rates, memory, features) with a detail drawer: definition,
     bindings, consumers and the **Message Inspector**.
