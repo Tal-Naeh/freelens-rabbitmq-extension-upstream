@@ -21,6 +21,16 @@
     box-sizing: border-box;
   }
 
+  // The page is a full-height flex column that scrolls. Its sections keep their natural height;
+  // only the table area shrinks (it has a min-height and scrolls inside). Otherwise a tall page
+  // squeezes the header, whose wrapped controls then overlap the next section, and the tab strips.
+  > * {
+    flex-shrink: 0;
+  }
+  > .RmqTableWrap {
+    flex-shrink: 1;
+  }
+
   h1 {
     margin: 0;
     font-size: 22px;

@@ -127,7 +127,11 @@ offers a username and password form.
   - *Exchanges*: table with publish in and out rates, drawer with outgoing
     and incoming bindings and a Publish form.
   - *Connections*: live tabs for connections, channels (prefetch, unacked,
-    confirm and tx mode) and consumers.
+    confirm and tx mode) and consumers, and a **Clients** tab that groups the
+    connections by the workload or pod that opened them, busiest first, with
+    each client's share of all connections. Peer addresses are matched to pod
+    IPs through the Freelens cluster connection; addresses that match no pod
+    are shown as they are.
 - **Resizable columns**: drag the right edge of any table header to resize,
   double-click it to reset; widths are remembered per table.
 - **Safety first**
@@ -168,6 +172,11 @@ One session (tunnel and client) per target, reused across pages, closed after
   without one the certificate of the pod is accepted inside the port-forward.
 - Brokers are reached through a port-forward to one Ready pod of the target,
   so a target without port-forwardable pods cannot be opened.
+- The **Clients** tab names a client only when the broker sees the pod's own
+  address. Behind a service-mesh sidecar (Istio, Linkerd) every client
+  arrives from a loopback address, shown as one "Loopback proxy" row; behind
+  NAT or a node port it shows the node or gateway address. Naming clients
+  lists the pods of the whole cluster, so it needs permission to list pods.
 
 ## Development
 

@@ -36,7 +36,8 @@ export interface CustomResourceRef {
  */
 export interface KubeReader {
   listCustomResources(ref: CustomResourceRef, namespace?: string): Promise<KubeObject[]>;
-  listPods(namespace: string, labelSelector?: string): Promise<KubeObject[]>;
+  /** Pods in `namespace`, or in every namespace when it is omitted. */
+  listPods(namespace?: string, labelSelector?: string): Promise<KubeObject[]>;
   listServices(namespace?: string): Promise<KubeObject[]>;
   /** Deployments + StatefulSets (each tagged with its `kind`), for env-based credential discovery. */
   listWorkloads(namespace?: string): Promise<KubeObject[]>;
@@ -79,7 +80,9 @@ export function createKubeReader(options: KubeReaderOptions = {}): KubeReader {
       }
     },
     async listPods(namespace, labelSelector) {
-      const res = await core.listNamespacedPod({ namespace, labelSelector });
+      const res = namespace
+        ? await core.listNamespacedPod({ namespace, labelSelector })
+        : await core.listPodForAllNamespaces({ labelSelector });
       return (res.items ?? []) as unknown as KubeObject[];
     },
     async listServices(namespace) {

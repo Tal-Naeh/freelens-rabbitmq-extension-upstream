@@ -1,6 +1,14 @@
 import { Renderer } from "@freelensapp/extensions";
 import { useMemo } from "react";
-import { RABBITMQ_LIVE_REFRESH_MS } from "../../common/constants";
+import { RABBITMQ_CLIENT_PODS_REFRESH_MS, RABBITMQ_LIVE_REFRESH_MS } from "../../common/constants";
+import {
+  addressFingerprint,
+  type ClientGroup,
+  type ClientGrouping,
+  clientAddresses,
+  groupConnectionsByClient,
+  workloadKey,
+} from "../clients";
 import { ConnectionErrorPanel } from "../components/connection-error";
 import {
   EmptyState,
@@ -14,7 +22,15 @@ import {
   WriteModeToggle,
 } from "../components/page-shell";
 import { type ColumnSpec, useResizableColumns } from "../components/resizable-columns";
-import { formatBytesRate, formatNumber, formatRate, formatTimestamp, matchesQuery, shortNodeName } from "../format";
+import {
+  formatBytesRate,
+  formatDuration,
+  formatNumber,
+  formatRate,
+  formatTimestamp,
+  matchesQuery,
+  shortNodeName,
+} from "../format";
 import { useDebounced, usePageParam, useResource, useSelectionParam } from "../hooks";
 import { RABBITMQ_PAGE_IDS } from "../navigation";
 import { useWriteMode } from "../write-mode-store";
@@ -29,9 +45,10 @@ export interface ConnectionsPageProps extends PageDeps {
   params?: { target: Param; query: Param; view: Param };
 }
 
-type View = "connections" | "channels" | "consumers";
+type View = "connections" | "clients" | "channels" | "consumers";
 const VIEWS: { value: View; label: string }[] = [
   { value: "connections", label: "Connections" },
+  { value: "clients", label: "Clients" },
   { value: "channels", label: "Channels" },
   { value: "consumers", label: "Consumers" },
 ];
@@ -246,6 +263,147 @@ function ChannelsTable({ items }: { items: ChannelDto[] }) {
   );
 }
 
+// Widths include padding (border-box). About 1,095 px in total, so the table fits a ~1,200 px content
+// area without horizontal scrolling and the client name takes whatever is left. Numeric headers keep
+// room for the sort arrow, which sits to the left of the label.
+const RABBITMQ_CLIENTS_COLUMNS: ColumnSpec[] = [
+  { id: "client", width: 230, grow: true, minWidth: 180 },
+  { id: "namespace", width: 95 },
+  { id: "kind", width: 105 },
+  { id: "pods", width: 50, numeric: true },
+  { id: "connections", width: 105, numeric: true },
+  { id: "share", width: 80, numeric: true },
+  { id: "channels", width: 80, numeric: true },
+  { id: "library", width: 105 },
+  { id: "recv", width: 90, numeric: true },
+  { id: "send", width: 85, numeric: true },
+  { id: "oldest", width: 70, numeric: true },
+];
+
+function clientKindLabel(g: ClientGroup): string {
+  if (g.kind === "workload") return g.workloadKind ?? "Workload";
+  if (g.kind === "pod") return g.workloadKind ? `${g.workloadKind} pod` : "Pod";
+  if (g.kind === "external") return g.loopback ? "Loopback proxy" : "Not a pod";
+  return "—";
+}
+
+/** Hover text for the client name: the owning workload of a pod, the addresses and the broker users. */
+function clientDetails(g: ClientGroup): string {
+  const owner = g.kind === "pod" && g.workload ? [`${g.workloadKind}/${g.workload}`] : [];
+  const addresses = g.ips.length > 0 ? [`${g.ips.length === 1 ? "Address" : "Addresses"}: ${g.ips.join(", ")}`] : [];
+  const users = g.users.length > 0 ? [`${g.users.length === 1 ? "User" : "Users"}: ${g.users.join(", ")}`] : [];
+  return [...owner, ...addresses, ...users].join("\n") || g.label;
+}
+
+function ClientsTable({ items, onOpen }: { items: ClientGroup[]; onOpen: (group: ClientGroup) => void }) {
+  const col = useResizableColumns("rabbitmq-clients", RABBITMQ_CLIENTS_COLUMNS);
+  return (
+    <Renderer.Component.Table<ClientGroup>
+      tableId="rabbitmq-clients"
+      autoSize={false}
+      scrollable
+      sortSyncWithUrl={false}
+      sortByDefault={{ sortBy: "connections", orderBy: "desc" }}
+      sortable={{
+        client: (g) => g.label,
+        namespace: (g) => g.namespace ?? "",
+        pods: (g) => g.pods,
+        connections: (g) => g.connections,
+        share: (g) => g.share,
+        channels: (g) => g.channels,
+        recv: (g) => g.recvRate,
+        send: (g) => g.sendRate,
+        // By age, matching what the column shows: ascending = youngest first.
+        oldest: (g) => (g.oldestConnectedAt === undefined ? -1 : Date.now() - g.oldestConnectedAt),
+      }}
+    >
+      <Renderer.Component.TableHead sticky nowrap>
+        <Renderer.Component.TableCell {...col.head("client")} sortBy="client">
+          Client
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("namespace")} sortBy="namespace">
+          Namespace
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("kind")}>Kind</Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("pods")} sortBy="pods">
+          Pods
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("connections")} sortBy="connections">
+          Connections
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("share")} sortBy="share">
+          Share
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("channels")} sortBy="channels">
+          Channels
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("library")}>Client library</Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("recv")} sortBy="recv">
+          From client
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("send")} sortBy="send">
+          To client
+        </Renderer.Component.TableCell>
+        <Renderer.Component.TableCell {...col.head("oldest")} sortBy="oldest">
+          Oldest
+        </Renderer.Component.TableCell>
+      </Renderer.Component.TableHead>
+      {items.map((g) => (
+        <Renderer.Component.TableRow
+          key={g.key}
+          sortItem={g}
+          nowrap
+          className={g.kind === "unknown" ? undefined : "clickable"}
+          onClick={g.kind === "unknown" ? undefined : () => onOpen(g)}
+        >
+          <Renderer.Component.TableCell {...col.cell("client")}>
+            {/* One line per row: cells lay out inline, so details go in the tooltip and the Kind/Pods columns. */}
+            <span className="RmqMono RmqEllipsis" title={clientDetails(g)}>
+              {g.label}
+            </span>
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("namespace")}>{g.namespace ?? "—"}</Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("kind")}>{clientKindLabel(g)}</Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("pods")}>
+            {g.pods > 0 ? formatNumber(g.pods) : "—"}
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("connections")}>
+            {formatNumber(g.connections)}
+            {g.blocked > 0 ? (
+              <Renderer.Component.Badge small label={`${formatNumber(g.blocked)} blocked`} className="error" />
+            ) : null}
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("share")}>
+            {Math.round(g.share * 100)}%
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("channels")}>
+            {formatNumber(g.channels)}
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("library")}>
+            <span className="RmqEllipsis">{g.libraries.join(", ") || "—"}</span>
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("recv")}>
+            {formatBytesRate(g.recvRate)}
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("send")}>
+            {formatBytesRate(g.sendRate)}
+          </Renderer.Component.TableCell>
+          <Renderer.Component.TableCell {...col.cell("oldest")}>
+            <span title={formatTimestamp(g.oldestConnectedAt)}>
+              {g.oldestConnectedAt === undefined ? "—" : formatDuration(Date.now() - g.oldestConnectedAt)}
+            </span>
+          </Renderer.Component.TableCell>
+        </Renderer.Component.TableRow>
+      ))}
+    </Renderer.Component.Table>
+  );
+}
+
+const GROUPINGS: Renderer.Component.SelectOption<ClientGrouping>[] = [
+  { value: "workload", label: "Group by workload" },
+  { value: "pod", label: "Group by pod" },
+];
+
 export function ConnectionsPage(props: ConnectionsPageProps) {
   const page = useTargetPage(props, props.params?.target);
   const { target, selection } = page;
@@ -261,8 +419,19 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
     () => props.client.connections(page.request()),
     {
       refreshMs: RABBITMQ_LIVE_REFRESH_MS,
-      enabled: view === "connections",
+      enabled: view === "connections" || view === "clients",
     },
+  );
+  const [rawGrouping, setGrouping] = useSelectionParam("connections.clientsBy", undefined);
+  const grouping: ClientGrouping = rawGrouping === "pod" ? "pod" : "workload";
+  // Set when a workload row is opened: the pod grouping then shows exactly that workload's pods.
+  const [drillWorkload, setDrillWorkload] = useSelectionParam("connections.clientsWorkload", undefined);
+  const addresses = useMemo(() => clientAddresses(connections.data?.items ?? []), [connections.data]);
+  // Pods change far less often than connection counters: resolve when the address set changes, then once a minute.
+  const clientPods = useResource(
+    scope && addresses.length > 0 ? `client-pods:${scope}:${addressFingerprint(addresses)}` : undefined,
+    () => props.client.clientPods({ clusterId: props.kubernetesClusterId, ips: addresses }),
+    { refreshMs: RABBITMQ_CLIENT_PODS_REFRESH_MS, enabled: view === "clients" },
   );
   const channels = useResource(scope ? `channels:${scope}` : undefined, () => props.client.channels(page.request()), {
     refreshMs: RABBITMQ_LIVE_REFRESH_MS,
@@ -276,7 +445,8 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
       enabled: view === "consumers",
     },
   );
-  const active = view === "connections" ? connections : view === "channels" ? channels : consumers;
+  const active =
+    view === "connections" || view === "clients" ? connections : view === "channels" ? channels : consumers;
 
   const filteredConnections = useMemo(
     () =>
@@ -293,6 +463,29 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
         ),
       ),
     [connections.data, debouncedQuery],
+  );
+  const filteredClients = useMemo(
+    () =>
+      groupConnectionsByClient(connections.data?.items ?? [], clientPods.data ?? [], grouping).filter(
+        (g) =>
+          (grouping !== "pod" ||
+            !drillWorkload ||
+            (g.namespace && g.workloadKind && g.workload
+              ? workloadKey(g.namespace, g.workloadKind, g.workload) === drillWorkload
+              : false)) &&
+          // `ip:` too, so the query left behind by opening a client's connections still finds that client.
+          matchesQuery(
+            debouncedQuery,
+            g.label,
+            g.namespace,
+            g.workload,
+            ...g.ips,
+            ...g.ips.map((ip) => `${ip}:`),
+            ...g.users,
+            ...g.libraries,
+          ),
+      ),
+    [connections.data, clientPods.data, grouping, drillWorkload, debouncedQuery],
   );
   const filteredChannels = useMemo(
     () =>
@@ -323,6 +516,26 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
         { label: "TLS", value: formatNumber(items.filter((c) => c.ssl).length) },
         { label: "Inbound", value: formatBytesRate(items.reduce((s, c) => s + (c.recvBytes.rate ?? 0), 0)) },
         { label: "Outbound", value: formatBytesRate(items.reduce((s, c) => s + (c.sendBytes.rate ?? 0), 0)) },
+      ];
+    }
+    if (view === "clients") {
+      const items = filteredClients;
+      const top = items[0];
+      const outside = items.filter((g) => g.kind === "external").length;
+      return [
+        { label: "Clients", value: formatNumber(items.length) },
+        { label: "Connections", value: formatNumber(items.reduce((s, g) => s + g.connections, 0)) },
+        {
+          label: "Busiest client",
+          value: top ? `${Math.round(top.share * 100)}%` : "—",
+          title: top ? `${top.label}: ${formatNumber(top.connections)} connections` : undefined,
+          tone: top && items.length > 1 && top.share >= 0.5 ? "warning" : undefined,
+        },
+        {
+          label: "Not a pod",
+          value: formatNumber(outside),
+          title: "Peer addresses that match no running pod: clients outside the cluster, NAT, or a service mesh proxy",
+        },
       ];
     }
     if (view === "channels") {
@@ -358,7 +571,22 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
       },
       { label: "Inactive", value: formatNumber(items.filter((c) => !c.active).length) },
     ];
-  }, [view, filteredConnections, filteredChannels, filteredConsumers]);
+  }, [view, filteredConnections, filteredClients, filteredChannels, filteredConsumers]);
+
+  // A workload row drills down to exactly its pods; a pod or an outside address to its connections.
+  // Connection names start with `<peer>:<port> ->`, so `<ip>:` matches that peer and not 10.0.0.1x.
+  const openClient = (g: ClientGroup) => {
+    if (g.kind === "workload" && g.namespace && g.workloadKind && g.workload) {
+      setDrillWorkload(workloadKey(g.namespace, g.workloadKind, g.workload));
+      setGrouping("pod");
+    } else if (g.ips[0]) {
+      setView("connections");
+      setQuery(`${g.ips[0]}:`);
+    }
+  };
+  const drillLabel = drillWorkload.replace(/^workload:/, "");
+  // Until the first pod lookup answers, every client would read as "Not a pod".
+  const podsPending = view === "clients" && addresses.length > 0 && !clientPods.data && !clientPods.error;
 
   const openQueue = (vh: string, queue: string) =>
     props.navigate(RABBITMQ_PAGE_IDS.queues, {
@@ -370,9 +598,11 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
   const count =
     view === "connections"
       ? filteredConnections.length
-      : view === "channels"
-        ? filteredChannels.length
-        : filteredConsumers.length;
+      : view === "clients"
+        ? filteredClients.length
+        : view === "channels"
+          ? filteredChannels.length
+          : filteredConsumers.length;
   const total = active.data?.totalCount;
 
   return (
@@ -403,13 +633,37 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
       </Renderer.Component.Tabs>
       <Toolbar>
         <SearchBox value={query} onChange={setQuery} placeholder={`Filter ${view}…`} />
+        {view === "clients" ? (
+          <Renderer.Component.Select
+            options={GROUPINGS}
+            value={grouping}
+            onChange={(o: Renderer.Component.SelectOption<ClientGrouping> | null) => {
+              setDrillWorkload("");
+              setGrouping(o?.value ?? "workload");
+            }}
+            themeName="lens"
+            menuPosition="fixed"
+          />
+        ) : null}
         <span className="RmqToolbarRight">
           {count}
-          {total !== undefined ? ` of ${total}` : ""} {view}
+          {view === "clients" ? ` clients from ${formatNumber(connections.data?.items.length)} connections` : null}
+          {view !== "clients" && total !== undefined ? ` of ${total}` : ""} {view === "clients" ? "" : view}
           {active.data?.truncated ? " · list truncated" : ""}
         </span>
       </Toolbar>
-      {active.data ? <MetricStrip ariaLabel={`${view} summary`} metrics={metrics} /> : null}
+      {active.data && !podsPending ? <MetricStrip ariaLabel={`${view} summary`} metrics={metrics} /> : null}
+      {view === "clients" && grouping === "pod" && drillWorkload ? (
+        <p className="RmqMuted">
+          Pods of <span className="RmqMono">{drillLabel}</span>{" "}
+          <Renderer.Component.Button plain label="Show all pods" onClick={() => setDrillWorkload("")} />
+        </p>
+      ) : null}
+      {view === "clients" && clientPods.error ? (
+        <p className="RmqMuted">
+          Could not list pods to name the clients ({clientPods.error.message}); showing peer addresses instead.
+        </p>
+      ) : null}
       {active.error ? (
         <ConnectionErrorPanel
           error={active.error}
@@ -420,10 +674,12 @@ export function ConnectionsPage(props: ConnectionsPageProps) {
         />
       ) : null}
       {active.loading && !active.data ? <LoadingState label={`Loading ${view}…`} /> : null}
+      {podsPending && active.data ? <LoadingState label="Matching client addresses to pods…" /> : null}
       {active.data && count === 0 ? <EmptyState icon="power_off" title={`No ${view}`} /> : null}
-      {count > 0 ? (
+      {count > 0 && !podsPending ? (
         <div className="RmqTableWrap">
           {view === "connections" ? <ConnectionsTable items={filteredConnections} /> : null}
+          {view === "clients" ? <ClientsTable items={filteredClients} onOpen={openClient} /> : null}
           {view === "channels" ? <ChannelsTable items={filteredChannels} /> : null}
           {view === "consumers" ? (
             <ConsumersTable
