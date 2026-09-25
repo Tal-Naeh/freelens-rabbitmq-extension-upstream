@@ -25,3 +25,5 @@ export const RABBITMQ_PEEK_DEFAULT_COUNT = 10;
 export const RABBITMQ_PEEK_TRUNCATE_BYTES = 64 * 1024;
 /** Auto-refresh interval for live views (connections/channels/overview). */
 export const RABBITMQ_LIVE_REFRESH_MS = 5_000;
+/** Auto-refresh interval for the Health page, which loads overview, queues and channels together. */
+export const RABBITMQ_HEALTH_REFRESH_MS = 15_000;

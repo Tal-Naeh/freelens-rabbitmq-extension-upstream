@@ -99,6 +99,7 @@ export class RabbitmqManagementClient {
         redeliver: rate(stats, "redeliver"),
         confirm: rate(stats, "confirm"),
         returnUnroutable: rate(stats, "return_unroutable"),
+        dropUnroutable: rate(stats, "drop_unroutable"),
       },
     };
   }
