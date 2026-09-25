@@ -32,6 +32,8 @@ describe("normalize", () => {
       consumer_capacity: 0.5,
       memory: 1024,
       message_stats: { publish_details: { rate: 2 }, deliver_get_details: { rate: 1 } },
+      members: ["rabbit@r-server-0", "rabbit@r-server-1"],
+      online: ["rabbit@r-server-0"],
       arguments: { "x-queue-type": "quorum" },
     });
     expect(q).toMatchObject({
@@ -47,8 +49,12 @@ describe("normalize", () => {
       memory: 1024,
       publish: { count: undefined, rate: 2 },
       deliverGet: { count: undefined, rate: 1 },
+      members: ["rabbit@r-server-0", "rabbit@r-server-1"],
+      online: ["rabbit@r-server-0"],
       arguments: { "x-queue-type": "quorum" },
     });
+    // Classic queues have no replica lists.
+    expect(toQueueSummary({ name: "c" }).members).toBeUndefined();
   });
 
   it("maps nodes, connections, channels and consumers", () => {

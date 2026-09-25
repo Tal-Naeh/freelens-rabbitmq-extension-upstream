@@ -1,6 +1,8 @@
 import { Main } from "@freelensapp/extensions";
 import { serializeIpcError } from "../common/errors";
 import {
+  type ClientPodDto,
+  type ClientPodsRequest,
   type CredentialsClearRequest,
   type CredentialsSetRequest,
   type CredentialsStateDto,
@@ -26,6 +28,7 @@ import {
 } from "../common/ipc";
 import { createCatalogKubeReader } from "./catalog-kube-reader";
 import { activeClusterId, resolveKubeconfigFor } from "./kubeconfig-resolver";
+import { resolveClientPods } from "./rabbitmq/client-pods";
 import { discoverRabbitmq } from "./rabbitmq/discovery";
 import { createKubeForwarder } from "./rabbitmq/kube-forwarder";
 import { type ProgressReporter, RabbitmqSessionManager } from "./rabbitmq/session-manager";
@@ -79,6 +82,11 @@ export class RabbitmqIpcMain extends Main.Ipc {
       report({ value: 100, phase: "done", label: `Found ${targets.length} target(s)` });
       return targets;
     });
+
+    // Read-only Kubernetes lookup (pods by IP) for the Connections > Clients view; no broker session.
+    this.route<ClientPodsRequest, ClientPodDto[]>(RABBITMQ_IPC.clientPods, (request) =>
+      resolveClientPods(createReader(request.clusterId), Array.isArray(request.ips) ? request.ips : []),
+    );
 
     this.route<TargetRequest, OverviewDto>(RABBITMQ_IPC.overview, (request) =>
       this.sessions.withSession(request.clusterId, request.target, this.reporter(request.operationId), async (s) => {

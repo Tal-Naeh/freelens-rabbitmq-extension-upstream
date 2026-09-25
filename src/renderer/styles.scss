@@ -21,6 +21,16 @@
     box-sizing: border-box;
   }
 
+  // The page is a full-height flex column that scrolls. Its sections keep their natural height;
+  // only the table area shrinks (it has a min-height and scrolls inside). Otherwise a tall page
+  // squeezes the header, whose wrapped controls then overlap the next section, and the tab strips.
+  > * {
+    flex-shrink: 0;
+  }
+  > .RmqTableWrap {
+    flex-shrink: 1;
+  }
+
   h1 {
     margin: 0;
     font-size: 22px;
@@ -471,6 +481,85 @@
   margin: 6px 0;
 }
 
+.RmqTag {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rmq-border);
+  background: rgba(127, 127, 127, 0.1);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--textColorPrimary);
+  &.ok {
+    border-color: var(--rmq-ok);
+    color: var(--rmq-ok);
+    background: rgba(61, 189, 107, 0.1);
+  }
+  &.warning {
+    border-color: var(--rmq-warn);
+    color: var(--rmq-warn);
+    background: rgba(224, 168, 0, 0.1);
+  }
+  &.error {
+    border-color: var(--rmq-err);
+    color: var(--rmq-err);
+    background: rgba(229, 72, 77, 0.1);
+  }
+}
+
+.RmqFindings {
+  gap: 0;
+  padding: 0;
+}
+.RmqFinding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--rmq-border);
+  &:first-child {
+    border-top: 0;
+  }
+  > .RmqTag {
+    flex: 0 0 auto;
+  }
+  .Button {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+.RmqFindingText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.RmqRuleList {
+  margin: 10px 0 12px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .RmqTag {
+    flex: 0 0 88px;
+    text-align: center;
+  }
+}
+.RmqHealthRules summary {
+  cursor: pointer;
+}
+
 .RmqClusterCard {
   display: flex;
   flex-direction: column;
@@ -512,30 +601,6 @@
     flex-wrap: wrap;
     gap: 6px;
     min-width: 0;
-  }
-  .RmqTag {
-    display: inline-block;
-    max-width: 100%;
-    padding: 2px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--rmq-border);
-    background: rgba(127, 127, 127, 0.1);
-    font-size: 11px;
-    line-height: 16px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--textColorPrimary);
-    &.ok {
-      border-color: var(--rmq-ok);
-      color: var(--rmq-ok);
-      background: rgba(61, 189, 107, 0.1);
-    }
-    &.warning {
-      border-color: var(--rmq-warn);
-      color: var(--rmq-warn);
-      background: rgba(224, 168, 0, 0.1);
-    }
   }
 
   .RmqClusterFacts {
