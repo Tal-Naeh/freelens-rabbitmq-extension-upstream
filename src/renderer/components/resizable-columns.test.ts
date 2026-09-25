@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnStyle, loadWidths, saveWidths } from "./resizable-columns";
+import { columnClassName, columnStyle, loadWidths, saveWidths } from "./resizable-columns";
 
 function memStorage() {
   const m = new Map<string, string>();
@@ -7,6 +7,13 @@ function memStorage() {
 }
 
 describe("resizable columns", () => {
+  it("marks numeric columns, and the growing column only until the user resizes it", () => {
+    expect(columnClassName({ id: "n", width: 90, numeric: true }, undefined)).toBe("RmqNum");
+    expect(columnClassName({ id: "a", width: 200, grow: true }, undefined, "extra")).toBe("extra RmqGrow");
+    expect(columnClassName({ id: "a", width: 200, grow: true }, 250)).toBe("");
+    expect(columnClassName({ id: "b", width: 90 }, undefined)).toBe("");
+  });
+
   it("styles growing, fixed and overridden columns", () => {
     expect(columnStyle({ id: "a", width: 200, grow: true }, undefined)).toEqual({ flex: "1 1 200px", minWidth: 120 });
     expect(columnStyle({ id: "b", width: 90 }, undefined)).toEqual({ flex: "0 0 90px", width: 90, minWidth: 48 });
