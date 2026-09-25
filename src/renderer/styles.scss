@@ -384,6 +384,10 @@
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+  .RmqSearch {
+    flex: 1 1 220px;
+    min-width: 200px;
+  }
 }
 
 .RmqTabs {
