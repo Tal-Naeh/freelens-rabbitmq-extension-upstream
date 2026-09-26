@@ -1,6 +1,7 @@
 import { Renderer } from "@freelensapp/extensions";
 import { useMemo, useState } from "react";
 import { RABBITMQ_PEEK_DEFAULT_COUNT, RABBITMQ_PEEK_MAX_COUNT } from "../../common/constants";
+import { planReplay } from "../../common/dead-letter";
 import { parseIpcError } from "../../common/errors";
 import { ErrorPanel, KeyValueList, SearchBox } from "../components/page-shell";
 import {
@@ -15,7 +16,14 @@ import {
 } from "../dead-letter";
 import { formatBytes, formatTimestamp, prettyJson } from "../format";
 
-import type { MessagesPeekDto, PeekedMessageDto, RabbitmqIpcErrorShape } from "../../common/ipc";
+import type { ReplayDestination } from "../../common/dead-letter";
+import type {
+  MessagesPeekDto,
+  PeekedMessageDto,
+  RabbitmqIpcErrorShape,
+  ReplayMessageInput,
+  ReplayResultDto,
+} from "../../common/ipc";
 
 function Payload({ message }: { message: PeekedMessageDto }) {
   if (message.contentKind === "binary") {
@@ -71,7 +79,14 @@ function DeathHistory({ death }: { death: DeathInfo }) {
   );
 }
 
-function MessageCard({ message }: { message: PeekedMessageDto }) {
+function MessageCard({
+  message,
+  selection,
+}: {
+  message: PeekedMessageDto;
+  /** Present when the message can be replayed: a dead letter with a complete payload. */
+  selection?: { selected: boolean; onChange: (selected: boolean) => void };
+}) {
   const [open, setOpen] = useState(message.index === 0);
   const props = message.properties;
   const death = useMemo(() => parseDeath(message), [message]);
@@ -84,6 +99,12 @@ function MessageCard({ message }: { message: PeekedMessageDto }) {
   return (
     <article className="RmqMessage">
       <div className="RmqMessageHead" onClick={() => setOpen((o) => !o)} role="button" tabIndex={0}>
+        {selection ? (
+          // Selecting must not expand or collapse the card.
+          <span className="RmqMessageSelect" onClick={(e) => e.stopPropagation()}>
+            <Renderer.Component.Checkbox value={selection.selected} onChange={selection.onChange} />
+          </span>
+        ) : null}
         <Renderer.Component.Icon material={open ? "expand_more" : "chevron_right"} small />
         <span className="RmqMessageIdx">#{message.index + 1}</span>
         <span className="RmqMono">{message.routingKey || "(no routing key)"}</span>
@@ -136,12 +157,39 @@ function MessageCard({ message }: { message: PeekedMessageDto }) {
  * Read-only Message Inspector: fetches up to N messages with `ack_requeue_true`, so nothing is
  * consumed. The broker still flags them `redelivered` — this is inherent to the Management API.
  */
+const REPLAY_DESTINATIONS: Renderer.Component.SelectOption<ReplayDestination>[] = [
+  { value: "failed-queue", label: "Back to the queue it failed in" },
+  { value: "original-exchange", label: "Original exchange and routing key" },
+];
+
+function toReplayInput(m: PeekedMessageDto): ReplayMessageInput {
+  return {
+    index: m.index,
+    payload: m.payload,
+    payloadEncoding: m.payloadEncoding,
+    truncated: m.truncated,
+    properties: m.properties,
+  };
+}
+
+function destinationLabel(exchange: string, routingKey: string): string {
+  return exchange ? `${exchange} · ${routingKey}` : `queue ${routingKey} (default exchange)`;
+}
+
 export function MessageInspector({
   peek,
   queueMessages,
+  queueName,
+  writeMode,
+  replay,
 }: {
   peek: (count: number) => Promise<MessagesPeekDto>;
   queueMessages: number;
+  /** The queue being inspected (named in the replay confirmation). */
+  queueName: string;
+  /** Replay is a write: it is offered only while Write Mode is armed for this target. */
+  writeMode: boolean;
+  replay?: (destination: ReplayDestination, messages: ReplayMessageInput[]) => Promise<ReplayResultDto>;
 }) {
   const [count, setCount] = useState(String(RABBITMQ_PEEK_DEFAULT_COUNT));
   const [result, setResult] = useState<MessagesPeekDto>();
@@ -149,6 +197,9 @@ export function MessageInspector({
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [reason, setReason] = useState("");
+  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
+  const [destination, setDestination] = useState<ReplayDestination>("failed-queue");
+  const [replayResult, setReplayResult] = useState<ReplayResultDto>();
   const messages = result?.messages ?? [];
   const summary = useMemo(() => summarizeDeaths(messages), [messages]);
   const reasonOptions: Renderer.Component.SelectOption<string>[] = [
@@ -171,11 +222,98 @@ export function MessageInspector({
     setError(undefined);
     try {
       setResult(await peek(n));
+      // Indices refer to the batch they were picked from.
+      setSelected(new Set());
+      setReplayResult(undefined);
     } catch (err) {
       setError(parseIpcError(err));
     } finally {
       setBusy(false);
     }
+  };
+
+  const isReplayable = (m: PeekedMessageDto) => Boolean(replay) && !m.truncated && parseDeath(m) !== undefined;
+  const replayableShown = shown.filter(isReplayable);
+  // Only what the user can see is replayed: selections hidden by the search or reason filter are left out.
+  const chosen = replayableShown.filter((m) => selected.has(m.index));
+  const hiddenSelected = messages.filter((m) => selected.has(m.index) && !shown.includes(m)).length;
+  const toggle = (index: number, on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(index);
+      else next.delete(index);
+      return next;
+    });
+  const allShownSelected = replayableShown.length > 0 && replayableShown.every((m) => selected.has(m.index));
+  const selectAllShown = (on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const m of replayableShown) {
+        if (on) next.add(m.index);
+        else next.delete(m.index);
+      }
+      return next;
+    });
+
+  const confirmReplay = () => {
+    if (!replay || chosen.length === 0) return;
+    // Preview with the same planner Main uses; Main recomputes and is the authority.
+    const groups = new Map<string, number>();
+    let skipped = 0;
+    for (const m of chosen) {
+      const plan = planReplay(m, destination);
+      if ("error" in plan) skipped += 1;
+      else {
+        const label = destinationLabel(plan.exchange, plan.routingKey);
+        groups.set(label, (groups.get(label) ?? 0) + 1);
+      }
+    }
+    Renderer.Component.ConfirmDialog.open({
+      labelOk: `Replay ${chosen.length}`,
+      message: (
+        <div className="RmqConfirm">
+          <p>
+            <strong>
+              Replay {chosen.length} message{chosen.length === 1 ? "" : "s"} from {queueName}
+            </strong>
+          </p>
+          <ul>
+            {[...groups].map(([label, n]) => (
+              <li key={label}>
+                {n} → {label}
+              </li>
+            ))}
+            {skipped > 0 ? <li>{skipped} cannot go to this destination and will be skipped</li> : null}
+          </ul>
+          <p>
+            Copies are published; the originals stay in {queueName} (purge it afterwards if you want). Replaying the
+            same messages again publishes duplicates. Dead-letter and delivery-count headers are removed; payload and
+            other properties are unchanged.
+          </p>
+          {destination === "original-exchange" ? (
+            <p>
+              <strong>Every queue bound to the original exchange with these routing keys receives a copy</strong>,
+              including consumers that already processed the message. CC/BCC headers are kept.
+            </p>
+          ) : null}
+        </div>
+      ),
+      ok: async () => {
+        setBusy(true);
+        try {
+          const res = await replay(destination, chosen.map(toReplayInput));
+          setReplayResult(res);
+          setSelected(new Set());
+          const text = `Replayed ${res.routed} of ${chosen.length}`;
+          if (res.routed === chosen.length) Renderer.Component.Notifications.ok(text);
+          else Renderer.Component.Notifications.error(`${text}: see the result above the messages`);
+        } catch (err) {
+          Renderer.Component.Notifications.error(`Replay failed: ${parseIpcError(err).message}`);
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   };
 
   return (
@@ -237,8 +375,79 @@ export function MessageInspector({
           </span>
         </div>
       ) : null}
+      {replayResult ? (
+        <div className={`RmqNotice ${replayResult.routed === replayResult.results.length ? "" : "warning"}`.trim()}>
+          <Renderer.Component.Icon material="replay" small />
+          <div>
+            <p>
+              <strong>
+                Replayed {replayResult.routed} of {replayResult.results.length}.
+              </strong>{" "}
+              {[
+                replayResult.unroutable > 0 ? `${replayResult.unroutable} unroutable` : "",
+                replayResult.skipped > 0 ? `${replayResult.skipped} skipped` : "",
+                replayResult.failed > 0 ? `${replayResult.failed} failed` : "",
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </p>
+            {replayResult.results
+              .filter((r) => r.outcome !== "routed")
+              .map((r) => (
+                <p key={r.index} className="RmqMuted">
+                  #{r.index + 1}: {r.outcome}
+                  {r.message ? ` - ${r.message}` : ""}
+                </p>
+              ))}
+          </div>
+        </div>
+      ) : null}
+      {replay && replayableShown.length > 0 ? (
+        <div className="RmqDrawerToolbar">
+          <Renderer.Component.Checkbox
+            label={`Select all dead-lettered shown (${replayableShown.length})`}
+            value={allShownSelected}
+            onChange={selectAllShown}
+          />
+          <Renderer.Component.Select
+            options={REPLAY_DESTINATIONS}
+            value={destination}
+            onChange={(o: Renderer.Component.SelectOption<ReplayDestination> | null) =>
+              setDestination(o?.value ?? "failed-queue")
+            }
+            themeName="lens"
+            menuPosition="fixed"
+          />
+          <Renderer.Component.Button
+            primary
+            label={busy ? "Replaying…" : `Replay ${chosen.length}…`}
+            disabled={!writeMode || busy || chosen.length === 0}
+            tooltip={writeMode ? undefined : "Enable Write Mode to replay"}
+            onClick={confirmReplay}
+          />
+          {!writeMode ? (
+            <span className="RmqMuted">
+              To replay, close this panel and switch Read-only to Write Mode in the page header.
+            </span>
+          ) : null}
+          {hiddenSelected > 0 ? (
+            <span className="RmqMuted">
+              {hiddenSelected} selected message{hiddenSelected === 1 ? " is" : "s are"} hidden by the filter and will
+              not be replayed.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {shown.map((m) => (
-        <MessageCard key={m.index} message={m} />
+        <MessageCard
+          key={m.index}
+          message={m}
+          selection={
+            isReplayable(m)
+              ? { selected: selected.has(m.index), onChange: (on: boolean) => toggle(m.index, on) }
+              : undefined
+          }
+        />
       ))}
       {messages.length > 0 && shown.length === 0 ? <p className="RmqMuted">No peeked message matches.</p> : null}
     </div>
