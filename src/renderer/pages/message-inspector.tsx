@@ -82,10 +82,13 @@ function DeathHistory({ death }: { death: DeathInfo }) {
 function MessageCard({
   message,
   selection,
+  replayedTo,
 }: {
   message: PeekedMessageDto;
   /** Present when the message can be replayed: a dead letter with a complete payload. */
   selection?: { selected: boolean; onChange: (selected: boolean) => void };
+  /** Set once this message was replayed successfully in this batch: where the copy went. */
+  replayedTo?: string;
 }) {
   const [open, setOpen] = useState(message.index === 0);
   const props = message.properties;
@@ -118,6 +121,11 @@ function MessageCard({
               {death.total > 1 ? ` · ${death.total}×` : ""}
             </span>
           </>
+        ) : null}
+        {replayedTo ? (
+          <span className="RmqMessageMeta" title={`A copy was replayed to ${replayedTo}`}>
+            <Renderer.Component.Badge small label="replayed" className="success" />
+          </span>
         ) : null}
         <Renderer.Component.Badge small label={message.contentKind.toUpperCase()} />
         {message.redelivered ? <Renderer.Component.Badge small label="redelivered" /> : null}
@@ -200,6 +208,9 @@ export function MessageInspector({
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const [destination, setDestination] = useState<ReplayDestination>("failed-queue");
   const [replayResult, setReplayResult] = useState<ReplayResultDto>();
+  // Messages of this batch already replayed successfully (index -> where the copy went), so a second
+  // "select all" does not publish duplicates by accident.
+  const [replayed, setReplayed] = useState<ReadonlyMap<number, string>>(new Map());
   const messages = result?.messages ?? [];
   const summary = useMemo(() => summarizeDeaths(messages), [messages]);
   const reasonOptions: Renderer.Component.SelectOption<string>[] = [
@@ -225,6 +236,7 @@ export function MessageInspector({
       // Indices refer to the batch they were picked from.
       setSelected(new Set());
       setReplayResult(undefined);
+      setReplayed(new Map());
     } catch (err) {
       setError(parseIpcError(err));
     } finally {
@@ -244,11 +256,14 @@ export function MessageInspector({
       else next.delete(index);
       return next;
     });
-  const allShownSelected = replayableShown.length > 0 && replayableShown.every((m) => selected.has(m.index));
+  const tooLarge = shown.filter((m) => m.truncated && parseDeath(m) !== undefined).length;
+  // "Select all" skips messages already replayed from this batch; they stay selectable one by one.
+  const selectable = replayableShown.filter((m) => !replayed.has(m.index));
+  const allShownSelected = selectable.length > 0 && selectable.every((m) => selected.has(m.index));
   const selectAllShown = (on: boolean) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      for (const m of replayableShown) {
+      for (const m of selectable) {
         if (on) next.add(m.index);
         else next.delete(m.index);
       }
@@ -290,6 +305,9 @@ export function MessageInspector({
             same messages again publishes duplicates. Dead-letter and delivery-count headers are removed; payload and
             other properties are unchanged.
           </p>
+          {destination === "failed-queue" ? (
+            <p>CC/BCC headers are removed, so each copy reaches only the queue it failed in.</p>
+          ) : null}
           {destination === "original-exchange" ? (
             <p>
               <strong>Every queue bound to the original exchange with these routing keys receives a copy</strong>,
@@ -304,6 +322,15 @@ export function MessageInspector({
           const res = await replay(destination, chosen.map(toReplayInput));
           setReplayResult(res);
           setSelected(new Set());
+          setReplayed((prev) => {
+            const next = new Map(prev);
+            for (const r of res.results) {
+              if (r.outcome === "routed" && r.routingKey !== undefined) {
+                next.set(r.index, destinationLabel(r.exchange ?? "", r.routingKey));
+              }
+            }
+            return next;
+          });
           const text = `Replayed ${res.routed} of ${chosen.length}`;
           if (res.routed === chosen.length) Renderer.Component.Notifications.ok(text);
           else Renderer.Component.Notifications.error(`${text}: see the result above the messages`);
@@ -402,10 +429,10 @@ export function MessageInspector({
           </div>
         </div>
       ) : null}
-      {replay && replayableShown.length > 0 ? (
+      {replay && (replayableShown.length > 0 || tooLarge > 0) ? (
         <div className="RmqDrawerToolbar">
           <Renderer.Component.Checkbox
-            label={`Select all dead-lettered shown (${replayableShown.length})`}
+            label={`Select all dead-lettered shown (${selectable.length})`}
             value={allShownSelected}
             onChange={selectAllShown}
           />
@@ -430,6 +457,12 @@ export function MessageInspector({
               To replay, close this panel and switch Read-only to Write Mode in the page header.
             </span>
           ) : null}
+          {tooLarge > 0 ? (
+            <span className="RmqMuted">
+              {tooLarge} dead letter{tooLarge === 1 ? " is" : "s are"} larger than the 64 KiB peek limit and cannot be
+              replayed.
+            </span>
+          ) : null}
           {hiddenSelected > 0 ? (
             <span className="RmqMuted">
               {hiddenSelected} selected message{hiddenSelected === 1 ? " is" : "s are"} hidden by the filter and will
@@ -447,6 +480,7 @@ export function MessageInspector({
               ? { selected: selected.has(m.index), onChange: (on: boolean) => toggle(m.index, on) }
               : undefined
           }
+          replayedTo={replayed.get(m.index)}
         />
       ))}
       {messages.length > 0 && shown.length === 0 ? <p className="RmqMuted">No peeked message matches.</p> : null}
