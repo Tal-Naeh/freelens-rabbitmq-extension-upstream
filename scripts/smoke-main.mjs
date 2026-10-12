@@ -2,8 +2,8 @@
  * Fast smoke test for the built Main bundle.
  *
  * Imports `dist/main.js` with the host API stubbed on `globalThis.FreelensExtensionApi`, to catch bundling
- * failures (a missing, ESM-only or optional-peer dependency, a CommonJS `require` of a builtin left in the ESM
- * bundle) that make the Main process throw at load - the class of bug that yields a silent
+ * failures (a missing, ESM-only or optional-peer dependency, a CommonJS `require` left in the ESM bundle) that
+ * make the Main process throw at load - the class of bug that yields a silent
  * "No handler registered" in Freelens. Unit tests cannot see this because they never load the bundled
  * dependencies.
  *

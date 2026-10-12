@@ -17,9 +17,3 @@ shellEmulator: true
 # extension shares with the host is outside the peer range of
 # @freelensapp/extensions.
 strictPeerDependencies: true
-
-# @kubernetes/client-node declares @types/node ^26 as a runtime dependency.
-# Left alone it installs a second major of the Node typings next to the 24.x
-# that matches the host's Node (.nvmrc), as Freelens's own workspace does.
-overrides:
-  '@kubernetes/client-node>@types/node': 24.19.1

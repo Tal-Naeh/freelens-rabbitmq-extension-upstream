@@ -26,17 +26,12 @@ const entryPoints = {
     // Renderer code gets no guarantee of Node or Electron, so nothing is left
     // for the runtime to resolve.
     external: [],
-    banner: undefined,
   },
   main: {
     entry: "src/main/index.ts",
     emptyOutDir: false,
     // Node and Electron resolve their own modules at runtime.
     external: ["electron", /^electron\//, /^node:/, ...builtinModules],
-    // Bundled CommonJS packages (@kubernetes/client-node and its dependencies) `require` Node builtins, and an ES
-    // module has no `require`: Rolldown's shim throws "Calling `require` for "node:assert" in an environment that
-    // doesn't expose the `require` function" when the bundle is loaded. Give the module one, as Node would.
-    banner: 'import { createRequire } from "node:module";\nconst require = createRequire(import.meta.url);',
   },
 };
 
@@ -105,7 +100,6 @@ export default defineConfig(({ mode }) => {
       },
       rolldownOptions: {
         external: entryPoint.external,
-        output: { banner: entryPoint.banner },
       },
     },
   };

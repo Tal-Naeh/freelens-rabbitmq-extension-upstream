@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { Main } from "@freelensapp/extensions";
 import { serializeIpcError } from "../common/errors";
 import {
@@ -28,11 +29,11 @@ import {
   type WriteModeStateDto,
   type WriteResultDto,
 } from "../common/ipc";
+import { activeClusterId } from "./active-cluster";
 import { createCatalogKubeReader } from "./catalog-kube-reader";
-import { activeClusterId, resolveKubeconfigFor } from "./kubeconfig-resolver";
 import { resolveClientPods } from "./rabbitmq/client-pods";
 import { discoverRabbitmq } from "./rabbitmq/discovery";
-import { createKubeForwarder } from "./rabbitmq/kube-forwarder";
+import { createKubectlTunnelOpener } from "./rabbitmq/port-forward";
 import { replayMessages } from "./rabbitmq/replay";
 import { type ProgressReporter, RabbitmqSessionManager } from "./rabbitmq/session-manager";
 
@@ -45,7 +46,14 @@ function createReader(clusterId?: string): KubeReader {
 export class RabbitmqIpcMain extends Main.Ipc {
   private readonly sessions = new RabbitmqSessionManager({
     createReader,
-    createForwarder: (clusterId) => createKubeForwarder(resolveKubeconfigFor(clusterId)),
+    openTunnel: (clusterId, target) => {
+      const id = clusterId ?? activeClusterId();
+      return createKubectlTunnelOpener({
+        getKubectlPath: () => Main.Shell.getKubectlPath(id),
+        getEnvironment: () => Main.Shell.getEnvironment(id),
+        spawn,
+      })(target);
+    },
   });
 
   constructor(extension: Main.LensExtension) {

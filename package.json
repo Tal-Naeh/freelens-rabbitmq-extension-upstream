@@ -68,11 +68,8 @@
     "rabbitmq:down": "docker compose -f test/e2e/docker-compose.yml down -v",
     "itest": "node --import tsx test/e2e/integration.local.ts"
   },
-  "dependencies": {
-    "@kubernetes/client-node": "2.0.0"
-  },
   "devDependencies": {
-    "@freelensapp/extensions": "2.0.0-0-nightly-2026-10-11",
+    "@freelensapp/extensions": "2.0.0-0-nightly-2026-10-12",
     "@testing-library/dom": "10.4.2",
     "@testing-library/react": "16.3.3",
     "@types/node": "24.19.1",

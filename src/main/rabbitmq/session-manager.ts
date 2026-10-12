@@ -4,12 +4,11 @@ import { resolveCredentials, resolveManagementTls } from "./credentials";
 import { createJsonHttpClient } from "./http";
 import { RabbitmqManagementClient } from "./management-client";
 import { resolveManagementPod } from "./pod-resolver";
-import { openTunnel } from "./port-forward";
 
 import type { DiscoveredRabbitmqInfo, RabbitmqProgressEvent } from "../../common/ipc";
 import type { ResolvedCredentials } from "./credentials";
 import type { KubeReader } from "./kube-reader";
-import type { Forwarder, Tunnel } from "./port-forward";
+import type { PodPort, Tunnel } from "./port-forward";
 
 export type ProgressReporter = (progress: Omit<RabbitmqProgressEvent, "operationId">) => void;
 
@@ -26,7 +25,7 @@ export interface RabbitmqSession {
 
 export interface SessionManagerDependencies {
   createReader(clusterId?: string): KubeReader;
-  createForwarder(clusterId?: string): Forwarder;
+  openTunnel(clusterId: string | undefined, target: PodPort): Promise<Tunnel>;
   idleMs?: number;
   httpTimeoutMs?: number;
   now?: () => number;
@@ -162,7 +161,7 @@ export class RabbitmqSessionManager {
       label: "Opening port-forward",
       detail: `${podPort.namespace}/${podPort.pod}:${podPort.port}`,
     });
-    const tunnel = await openTunnel(this.deps.createForwarder(clusterId), podPort);
+    const tunnel = await this.deps.openTunnel(clusterId, podPort);
 
     const client = new RabbitmqManagementClient(
       createJsonHttpClient({

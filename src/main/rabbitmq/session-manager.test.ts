@@ -12,7 +12,10 @@ const noopReader: KubeReader = {
 };
 
 describe("RabbitmqSessionManager write-mode gate", () => {
-  const mgr = new RabbitmqSessionManager({ createReader: () => noopReader, createForwarder: () => () => {} });
+  const mgr = new RabbitmqSessionManager({
+    createReader: () => noopReader,
+    openTunnel: () => Promise.reject(new Error("no tunnel in this test")),
+  });
 
   it("is read-only by default and throws a typed error", () => {
     expect(mgr.isWriteMode("c", "t")).toBe(false);
