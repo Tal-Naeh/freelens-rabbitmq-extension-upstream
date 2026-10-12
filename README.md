@@ -41,8 +41,8 @@ architecture, tailored for RabbitMQ.
 
 ## Requirements
 
-- **Freelens >= 1.8.0.** Verified on Freelens 1.10.3, the version the
-  integration tests run against.
+- **Freelens >= 2.0.0** (extension API v2). Freelens 1.x needs the 0.4.x
+  releases of this extension.
 - **RabbitMQ management plugin** enabled on the brokers. It is included in
   the `*-management` images, in the RabbitMQ Cluster Operator and in the
   Bitnami chart.
@@ -69,20 +69,23 @@ Passwords are never sent to the renderer, never persisted and never logged.
 
 ## Installation
 
-Install the extension from the Freelens **Extensions** page
-(`ctrl`+`shift`+`E` or `cmd`+`shift`+`E`) by npm name:
+Open the Freelens **Extensions** page (`ctrl`+`shift`+`E` or
+`cmd`+`shift`+`E`). The field at the top takes a package name, the URL of a
+tarball, or the path to a tarball or a directory. Install by npm name:
 
 ```text
 @freelensapp/rabbitmq-extension
 ```
 
-Alternatively, download the `.tgz` from the
-[GitHub releases](https://github.com/freelensapp/freelens-rabbitmq-extension/releases)
-page and drag it into the Freelens window, or provide its path on the
-Extensions page.
+Alternatively, each
+[GitHub release](https://github.com/freelensapp/freelens-rabbitmq-extension/releases)
+has the extension as a `.tgz` with its checksum in a `.tgz.sha256` next to it.
+Enter the URL of the `.tgz`, or download both files into one directory and
+enter the path to the `.tgz` or drop it on the Freelens window; Freelens
+checks the tarball against the checksum.
 
-You can also build and pack the extension yourself, see
-[Build from the source](#build-from-the-source).
+You can also build the extension yourself and install it from your checkout,
+see [Build from the source](#build-from-the-source).
 
 ## Getting started
 
@@ -199,14 +202,14 @@ One session (tunnel and client) per target, reused across pages, closed after
 
 ## Development
 
-Node 24.15.0 (`.nvmrc`, `mise.toml`) and `corepack pnpm`. Run the local
+Node 24 (`.nvmrc`, `mise.toml`) and `corepack pnpm`. Run the local
 gates after every change:
 
 ```sh
 pnpm type:check
 pnpm lint:check      # biome (lint:fix to auto-format)
 pnpm trunk:check     # Markdown, YAML and the other formats
-pnpm build           # electron-vite, then a Main bundle smoke test
+pnpm build           # Vite (renderer, then main), then a Main bundle smoke test
 pnpm knip:check
 pnpm test:unit
 ```
@@ -251,8 +254,8 @@ nvm install
 mise install
 # or
 winget install CoreyButler.NVMforWindows
-nvm install 24.15.0
-nvm use 24.15.0
+nvm install 24
+nvm use 24
 ```
 
 Install pnpm:
@@ -273,7 +276,24 @@ pnpm build
 pnpm pack
 ```
 
-One script to build and pack the extension for testing:
+### Development loop
+
+Build once, then on the Extensions page enter the path to your checkout (the
+directory with `package.json`) and press Install. Freelens runs the extension
+from that directory, from the files in `dist/`, and lists it as unverified.
+Then run:
+
+```sh
+pnpm dev
+```
+
+It rebuilds the extension whenever a source file changes, and Freelens
+reloads it after each rebuild, without a restart and without packing. Neither
+`pnpm build` nor `pnpm dev` type-checks; run `pnpm type:check` for that. A
+change to `main` or `renderer` in `package.json` needs Freelens restarted
+once.
+
+To try a tarball instead, one script builds and packs the extension:
 
 ```sh
 pnpm pack:dev
@@ -321,10 +341,10 @@ pnpm build
 pnpm pack -r
 ```
 
-Then in the extension repository:
+Then in the extension repository, which already has an `overrides:` block
+at the end of `pnpm-workspace.yaml`:
 
 ```sh
-echo "overrides:" >> pnpm-workspace.yaml
 for i in ../freelens/*.tgz; do
   name=$(tar zxOf $i package/package.json | yq -r .name)
   echo "  \"$name\": $i" >> pnpm-workspace.yaml

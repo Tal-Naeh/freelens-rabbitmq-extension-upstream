@@ -47,4 +47,4 @@ discover ──▶ DiscoveredRabbitmqInfo[]      (discovery.ts; KubeReader seam)
 - `vitest` unit tests colocated with the engine and UI helpers (fakes for `KubeReader`, `JsonHttpClient`,
   a TCP-pipe `Forwarder`).
 - `test/e2e/integration.local.ts` runs the real HTTP client + normalisers against a Docker broker.
-- `scripts/smoke-main.cjs` loads the built Main bundle with host globals stubbed (catches bundling errors).
+- `scripts/smoke-main.mjs` imports the built Main bundle with the host API stubbed (catches bundling errors).
