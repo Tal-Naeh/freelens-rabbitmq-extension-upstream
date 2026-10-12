@@ -17,11 +17,19 @@ export interface Tunnel {
 /** Opens a local tunnel to a pod port. */
 export type TunnelOpener = (target: PodPort) => Promise<Tunnel>;
 
+/** The reporting callbacks of `Main.Shell.KubectlDownloadOptions` the tunnel uses. */
+export interface KubectlPreparationOptions {
+  onPhase?: (message: string) => void;
+  onProblem?: (message: string) => void;
+}
+
 export interface KubectlTunnelDependencies {
-  /** The kubectl Freelens runs for the cluster (`Main.Shell.getKubectlPath`). */
-  getKubectlPath(): Promise<string>;
+  /** The kubectl Freelens runs for the cluster (`Main.Shell.getKubectlPath`), which may download it. */
+  getKubectlPath(options: KubectlPreparationOptions): Promise<string>;
   /** An environment whose kubeconfig reaches the cluster through Freelens (`Main.Shell.getEnvironment`). */
-  getEnvironment(): Promise<Record<string, string>>;
+  getEnvironment(options: KubectlPreparationOptions): Promise<Record<string, string>>;
+  /** Where a preparation phase (such as downloading the version-matched kubectl) is reported. */
+  log?: (message: string) => void;
   spawn(command: string, args: string[], options: SpawnOptions): ChildProcess;
   readyTimeoutMs?: number;
 }
@@ -51,7 +59,15 @@ export function createKubectlTunnelOpener(deps: KubectlTunnelDependencies): Tunn
   const readyTimeoutMs = deps.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS;
 
   return async (target) => {
-    const [kubectl, env] = await Promise.all([deps.getKubectlPath(), deps.getEnvironment()]);
+    // A problem preparing the version-matched kubectl does not stop the call (Freelens goes on with the bundled
+    // kubectl), but it explains a tunnel that then fails, so it is added to the error.
+    const problems = new Set<string>();
+    const options: KubectlPreparationOptions = {
+      onPhase: (message) => deps.log?.(`kubectl for ${describe(target)}: ${message}`),
+      onProblem: (message) => problems.add(message),
+    };
+    // The ready timeout starts below, after kubectl is prepared, so a download does not count against it.
+    const [kubectl, env] = await Promise.all([deps.getKubectlPath(options), deps.getEnvironment(options)]);
     const args = [
       "port-forward",
       "--address",
@@ -76,7 +92,8 @@ export function createKubectlTunnelOpener(deps: KubectlTunnelDependencies): Tunn
         settled = true;
         clearTimeout(timer);
         child.kill();
-        reject(new RabbitmqError("unreachable", message));
+        const notes = [...problems].map((problem) => ` (kubectl: ${problem})`).join("");
+        reject(new RabbitmqError("unreachable", `${message}${notes}`));
       };
 
       const timer = setTimeout(

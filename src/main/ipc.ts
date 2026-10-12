@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { Main } from "@freelensapp/extensions";
+import { Common, Main } from "@freelensapp/extensions";
 import { serializeIpcError } from "../common/errors";
 import {
   type ClientPodDto,
@@ -49,8 +49,9 @@ export class RabbitmqIpcMain extends Main.Ipc {
     openTunnel: (clusterId, target) => {
       const id = clusterId ?? activeClusterId();
       return createKubectlTunnelOpener({
-        getKubectlPath: () => Main.Shell.getKubectlPath(id),
-        getEnvironment: () => Main.Shell.getEnvironment(id),
+        getKubectlPath: (options) => Main.Shell.getKubectlPath(id, options),
+        getEnvironment: (options) => Main.Shell.getEnvironment(id, options),
+        log: (message) => Common.logger.info(`[rabbitmq] ${message}`),
         spawn,
       })(target);
     },

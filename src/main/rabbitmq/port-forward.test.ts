@@ -103,4 +103,26 @@ describe("createKubectlTunnelOpener", () => {
     await expect(open(target)).rejects.toThrow("cluster is not connected");
     expect(calls).toHaveLength(0);
   });
+
+  it("adds the kubectl preparation problems to the error and logs its phases", async () => {
+    const log = vi.fn();
+    const { child, calls, open } = setup({
+      log,
+      getKubectlPath: async (options) => {
+        options.onPhase?.("verifying the download");
+        options.onProblem?.("checksum mismatch, using the bundled kubectl");
+        return "/opt/freelens/kubectl";
+      },
+    });
+    const opening = open(target);
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+
+    child.stderr.write("error: unable to forward port\n");
+    child.emit("exit", 1, null);
+    await expect(opening).rejects.toMatchObject({
+      code: "unreachable",
+      message: expect.stringContaining("(kubectl: checksum mismatch, using the bundled kubectl)"),
+    });
+    expect(log).toHaveBeenCalledWith("kubectl for shop/orders-server-0:15672: verifying the download");
+  });
 });
