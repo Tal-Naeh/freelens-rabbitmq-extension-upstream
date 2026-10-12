@@ -170,7 +170,7 @@ offers a username and password form.
 Renderer (React pages) ── IPC ──▶ Main (Node)
                                    ├─ discovery:  Main.K8s (Freelens cluster connection) → CRDs, Services, Workloads
                                    ├─ credentials: Secrets → username/password (+ CA)
-                                   ├─ port-forward: @kubernetes/client-node SPDY → pod:15672 ⇄ 127.0.0.1:<random>
+                                   ├─ port-forward: Freelens's kubectl (via the Freelens proxy) → pod:15672 ⇄ 127.0.0.1:<random>
                                    └─ HTTP client: GET/POST/DELETE /api/... (Basic auth)
 ```
 

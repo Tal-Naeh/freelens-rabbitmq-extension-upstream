@@ -4,7 +4,8 @@
 
 ### Changed
 
-- **Requires Freelens 2.0.0.** Ported to the Freelens v2 extension API: `engines.freelens` is `^2.0.0`, the extension is built as ES modules (`dist/main.js`, `dist/renderer.js`, `dist/renderer.css`) with the build, type-check, test and lint setup of freelens-example-extension, against React 19 and the `@freelensapp/extensions` nightly. The stylesheet ships as `renderer.css` instead of being injected at runtime, and every page renders inside an error boundary. `@kubernetes/client-node` 2.0.0, as in Freelens. Freelens 1.x keeps working with 0.4.x.
+- **Requires Freelens 2.0.0.** Ported to the Freelens v2 extension API: `engines.freelens` is `^2.0.0`, the extension is built as ES modules (`dist/main.js`, `dist/renderer.js`, `dist/renderer.css`) with the build, type-check, test and lint setup of freelens-example-extension, against React 19 and the `@freelensapp/extensions` nightly. The stylesheet ships as `renderer.css` instead of being injected at runtime, and every page renders inside an error boundary. Freelens 1.x keeps working with 0.4.x.
+- The port-forward to the Management API runs Freelens's own kubectl (`kubectl port-forward` through the Freelens proxy, like Freelens's port-forwards) instead of a bundled `@kubernetes/client-node`, so it follows the cluster's proxy settings and the kubectl Freelens picks for the cluster. `@kubernetes/client-node` is gone, and `dist/main.js` shrinks from several MB to about 64 kB. It needs the same `pods/portforward` permission as before.
 
 ### Added
 

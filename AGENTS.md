@@ -72,7 +72,7 @@ src/
   main/rabbitmq/           # Engine: discovery, credentials, pod resolver, port-forward,
                            # management client, http, normalize, session manager
   main/catalog-kube-reader.ts   # Kubernetes reads through Main.K8s (the only read seam)
-  main/kubeconfig-resolver.ts   # Finds the user's kubeconfig for the port-forward
+  main/active-cluster.ts   # The cluster to use when a request names none
   renderer/index.tsx       # Renderer entry point: cluster pages and sidebar menus
   renderer/pages/          # Clusters, Overview, Queues, Exchanges, Connections, details
   renderer/components/     # Page shell, target selector, resizable columns, errors
@@ -91,9 +91,10 @@ source maps, all ES modules.
 
 ### Engine rules
 
-- `KubeReader` (`catalog-kube-reader.ts`) is the only Kubernetes read seam; the
-  `Forwarder` (`kube-forwarder.ts`, `@kubernetes/client-node` PortForward) is the only
-  write-ish seam. Do not add other Kubernetes clients.
+- `KubeReader` (`catalog-kube-reader.ts`, `Main.K8s`) is the only Kubernetes read seam;
+  the tunnel opener (`port-forward.ts`, `kubectl port-forward` run with
+  `Main.Shell.getKubectlPath`/`getEnvironment`) is the only write-ish seam. Both go
+  through the Freelens proxy. Do not add other Kubernetes clients or bundle one.
 - The Management API is reached only through the port-forward tunnel on `127.0.0.1`,
   with Node core `http`/`https`. No heavy HTTP clients.
 - Sessions are keyed by `(clusterId, targetId)`, idle-closed after 5 minutes.
@@ -130,11 +131,11 @@ they are devDependencies, pinned to the host's versions, for types and tests
 only. `@freelensapp/extensions` is a three-line shim over the same global and
 is bundled.
 
-- `@kubernetes/client-node` is the one runtime dependency, bundled into
-  `dist/main.js`. It and its dependencies are CommonJS that `require` Node
-  builtins, so the main build gives the ES module a `require` through a
-  `createRequire` banner (`vite.config.mjs`); `pnpm smoke:main` fails the build
-  if a bundled `require` breaks at load.
+- There are no runtime dependencies: Kubernetes is reached through the host
+  (`Main.K8s` for reads, the host's kubectl for the port-forward), and the
+  Management API through Node core `http`/`https`. `pnpm smoke:main` loads
+  `dist/main.js` at the end of `pnpm build` and fails it if the bundle throws
+  at load.
 - The renderer gets no Node or Electron: the build fails on such an import,
   and `pnpm type:check` on a Node global (`Buffer`, `process`).
 - The stylesheet is imported for its side effect (`import "./styles.scss"`)
@@ -185,7 +186,7 @@ Code in `src/common/` is shared between both processes. The renderer never talks
 
 ## Testing
 
-- **Unit** (`pnpm test:unit`): vitest, fakes for `KubeReader`, `JsonHttpClient` and a TCP-pipe `Forwarder`. Every engine change ships with unit tests, including the failure and disarmed paths.
+- **Unit** (`pnpm test:unit`): vitest, fakes for `KubeReader`, `JsonHttpClient` and a fake-spawn kubectl for the tunnel opener. Every engine change ships with unit tests, including the failure and disarmed paths.
 - **Engine e2e** (`pnpm rabbitmq:up && pnpm itest && pnpm rabbitmq:down`): the real HTTP client and normalisers against a Docker broker (`test/e2e/docker-compose.yml`).
 - **Bundle smoke** (`pnpm smoke:main`, part of `pnpm build`): imports the built Main bundle with the host API stubbed.
 - **Integration inside Freelens** (`integration/__tests__/`): Playwright tests run by CI inside a packaged Freelens on a kind cluster, with the disposable broker from `integration/fixtures/rabbitmq/`. They install the packed extension and check the RabbitMQ pages against the fixture.
