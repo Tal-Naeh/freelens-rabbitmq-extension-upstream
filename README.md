@@ -46,10 +46,12 @@ architecture, tailored for RabbitMQ.
 - **RabbitMQ management plugin** enabled on the brokers. It is included in
   the `*-management` images, in the RabbitMQ Cluster Operator and in the
   Bitnami chart.
-- **Kubernetes access** through the kubeconfig Freelens uses for the
-  cluster. Discovery reads `RabbitmqCluster` resources, Services, workloads
-  and Secrets through the Freelens connection; the port-forward uses your
-  kubeconfig context.
+- **Kubernetes access** through the Freelens connection to the cluster.
+  Discovery reads `RabbitmqCluster` resources, Services, workloads and
+  Secrets through it, and the port-forward runs the kubectl Freelens runs for
+  the cluster with the proxy kubeconfig Freelens gives it, so it
+  authenticates the way the cluster connection does (including `exec`
+  plugins) and needs the `pods/portforward` permission.
 - **Node.js** is required only when building the extension from source; it
   is not needed to run it. The package is a self-contained bundle.
 
@@ -113,9 +115,10 @@ offers a username and password form.
   the Secret the workload references in its environment. TLS management
   listeners use the operator CA Secret. Manual credentials can be entered per
   session.
-- **Lightweight transport**: no AMQP client. A Kubernetes SPDY port-forward
-  to one broker pod's management port plus a small JSON-over-HTTP client on
-  Node's core `http`/`https`.
+- **Lightweight transport**: no AMQP client and no Kubernetes client
+  library. A `kubectl port-forward` to one broker pod's management port,
+  through the Freelens proxy, plus a small JSON-over-HTTP client on Node's
+  core `http`/`https`.
 - **Views**
   - *Clusters*: every discovered target with provider, version, replicas,
     ports and credential source.
