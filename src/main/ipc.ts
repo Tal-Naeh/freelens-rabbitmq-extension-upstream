@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { dirname } from "node:path";
 import { Common, Main } from "@freelensapp/extensions";
 import { serializeIpcError } from "../common/errors";
 import {
@@ -46,14 +47,16 @@ function createReader(clusterId?: string): KubeReader {
 export class RabbitmqIpcMain extends Main.Ipc {
   private readonly sessions = new RabbitmqSessionManager({
     createReader,
-    openTunnel: (clusterId, target) => {
+    openTunnel: (clusterId, target, options) => {
       const id = clusterId ?? activeClusterId();
       return createKubectlTunnelOpener({
         getKubectlPath: (options) => Main.Shell.getKubectlPath(id, options),
         getEnvironment: (options) => Main.Shell.getEnvironment(id, options),
         log: (message) => Common.logger.info(`[rabbitmq] ${message}`),
+        // the extension's own folder: the working directory of the application is unspecified
+        cwd: dirname(this.extension.manifestPath),
         spawn,
-      })(target);
+      })(target, options);
     },
   });
 
